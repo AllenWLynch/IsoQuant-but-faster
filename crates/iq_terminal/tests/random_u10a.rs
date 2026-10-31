@@ -44,7 +44,11 @@ fn random_stable_bit_exact() {
     let s = summary("u10a_random_stable.jsonl.gz");
     assert!(s.all_ok());
     assert!(s.by_key.values().all(|t| t.explained.is_empty()));
-    // Bit-exact, beyond the comparator's tolerances.
+    // Bit-exact, beyond the comparator's tolerances. Only on Linux: the reference values came from
+    // glibc's libm, and other platforms' powf/ln can differ in the last bit.
+    if !cfg!(target_os = "linux") {
+        return;
+    }
     let ctx = FixtureCtx::open(&data("u10a_random_stable.jsonl.gz"));
     let (mut n_peaks, mut n_xgb) = (0, 0);
     for c in read_lines::<Case>(&data("u10a_random_stable.jsonl.gz")).unwrap() {

@@ -1,0 +1,25 @@
+[package]
+name = "iq_bam"
+description = "U2: BAM fetch (noodles), RecordLite, FASTA mmap"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+quirks41 = ["iq_types/quirks41"]
+# rust-htslib fallback backend (design §6.1); off by default.
+htslib = ["dep:rust-htslib"]
+
+[dependencies]
+iq_types.workspace = true
+noodles-bam.workspace = true
+noodles-bgzf.workspace = true
+noodles-sam.workspace = true
+noodles-csi.workspace = true
+memmap2.workspace = true
+rust-htslib = { workspace = true, optional = true }
+
+[lints]
+workspace = true

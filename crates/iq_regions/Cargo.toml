@@ -1,0 +1,22 @@
+[package]
+name = "iq_regions"
+description = "U3: pass A, split_coverage_regions, read ownership"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+quirks41 = ["iq_types/quirks41"]
+
+[dependencies]
+iq_types.workspace = true
+# fixture runner only: sequential BGZF (= multi-member gzip) reading of the slice BAMs
+flate2.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

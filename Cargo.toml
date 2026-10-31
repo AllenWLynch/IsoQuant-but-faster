@@ -1,0 +1,78 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/iq_types",
+    "crates/iq_annot",
+    "crates/iq_bam",
+    "crates/iq_regions",
+    "crates/iq_read",
+    "crates/iq_assign",
+    "crates/iq_collect",
+    "crates/iq_terminal",
+    "crates/iq_graph",
+    "crates/iq_model",
+    "crates/iq_quant",
+    "crates/iq_sched",
+    "bins/iqrs",
+    "bins/iqrs-fixture",
+    "bins/iqrs-compare",
+]
+# harness/ is the Python capture package (iqcap); not part of the cargo build.
+exclude = ["harness"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+license = "GPL-2.0-only"
+publish = false
+
+[workspace.dependencies]
+# internal
+iq_types = { path = "crates/iq_types" }
+iq_annot = { path = "crates/iq_annot" }
+iq_bam = { path = "crates/iq_bam" }
+iq_regions = { path = "crates/iq_regions" }
+iq_read = { path = "crates/iq_read" }
+iq_assign = { path = "crates/iq_assign" }
+iq_collect = { path = "crates/iq_collect" }
+iq_terminal = { path = "crates/iq_terminal" }
+iq_graph = { path = "crates/iq_graph" }
+iq_model = { path = "crates/iq_model" }
+iq_quant = { path = "crates/iq_quant" }
+iq_sched = { path = "crates/iq_sched" }
+
+# external (design doc §11; keep this list minimal)
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
+smallvec = { version = "1", features = ["serde", "union", "const_generics"] }
+indexmap = { version = "2", features = ["serde"] }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+rustc-hash = "2"
+rayon = "1"
+crossbeam-channel = "0.5"
+memmap2 = "0.9"
+lexopt = "0.3"
+anyhow = "1"
+noodles-bam = "0.98"
+noodles-bgzf = "0.52"
+noodles-sam = "0.93"
+noodles-csi = "0.62"
+rust-htslib = { version = "1", default-features = false }
+proptest = "1"
+
+# Dependencies (serde_json, flate2, proptest, ...) optimised in dev/test builds so that the
+# fixture tests over real captures stay fast; workspace crates keep debug settings.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+debug = 1
+
+[workspace.lints.clippy]
+# Several types intentionally mirror IsoQuant field names / tuple shapes.
+too_many_arguments = "allow"
+type_complexity = "allow"

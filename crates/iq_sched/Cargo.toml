@@ -1,0 +1,33 @@
+[package]
+name = "iq_sched"
+description = "U21: work units, admission control, rayon orchestration, spill"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+quirks41 = ["iq_types/quirks41", "iq_annot/quirks41", "iq_assign/quirks41", "iq_bam/quirks41", "iq_regions/quirks41", "iq_collect/quirks41", "iq_terminal/quirks41", "iq_graph/quirks41", "iq_model/quirks41", "iq_quant/quirks41"]
+
+[dependencies]
+iq_types.workspace = true
+iq_annot.workspace = true
+iq_assign.workspace = true
+iq_bam.workspace = true
+iq_regions.workspace = true
+iq_collect.workspace = true
+iq_terminal.workspace = true
+iq_graph.workspace = true
+iq_model.workspace = true
+iq_quant.workspace = true
+rayon.workspace = true
+crossbeam-channel.workspace = true
+memmap2.workspace = true
+
+[dev-dependencies]
+# vtg_proto example (M1 memory prototype)
+iq_read.workspace = true
+
+[lints]
+workspace = true

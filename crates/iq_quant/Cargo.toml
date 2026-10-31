@@ -1,0 +1,20 @@
+[package]
+name = "iq_quant"
+description = "U20: counters, GTF/TSV writers, ID renumbering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+quirks41 = ["iq_types/quirks41", "iq_annot/quirks41"]
+
+[dependencies]
+iq_types.workspace = true
+iq_annot.workspace = true
+rustc-hash.workspace = true
+flate2.workspace = true
+
+[lints]
+workspace = true

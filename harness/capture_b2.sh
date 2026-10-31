@@ -1,0 +1,50 @@
+#!/bin/bash
+# Fixture capture batch 2. Usage: capture_b2.sh local|sbatch [filter-regex]
+# Same mechanics as capture_all.sh; entries carry extra env (NOVEL_UNSPLICED, EXTRA_IQARGS, SRC_BAM, KEEP_NAMES,
+# BLOCK_CAP) in the last column ("-" = none). Writes only fixtures/<sample>/b2_*/ (never touches M0a dirs).
+set -uo pipefail
+MODE=$1; FILT=${2:-.}
+H=/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r/iqrs/harness
+F=/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r/fixtures
+SMALL="1.0"
+MID="U4=0.25,U5=0.1,U6=0.5,U7=0.25,U20=0.25,default=1"
+DEEP="U4=0.05,U5=0.02,U6=0.25,U7=0.05,U20=0.1,default=1"
+# where sample slice regions dtype rates subsample units env
+TABLE=$(cat <<T
+L SRR33046254 b2_ordinary 8:8699085-8704430,8:14170567-14183265,8:16758304-16769798,8:22521729-22542545,8:51350453-51367298 nanopore SMALL 1.0 all -
+L SRR33046254 b2_deepest 8:30699499-30827785 nanopore MID 1.0 all -
+L SRR33046254 b2_multigene 8:23678436-23882242 nanopore SMALL 1.0 all -
+L SRR33046254 b2_nogene 8:40502837-40522974,8:50137473-50139985,8:7644321-7658264 nanopore SMALL 1.0 all -
+L SRR33046254 b2_valley 8:21104496-21142297 nanopore SMALL 1.0 all -
+L SRR32588720 b2_ordinary 8:7205524-7308373,8:11884671-11988065,8:14058185-14080534,8:23355484-23381548,8:50742975-50839564 pacbio_ccs SMALL 1.0 all -
+L SRR32588720 b2_deepest 8:47098781-47214606 pacbio_ccs MID 1.0 all -
+L SRR32588720 b2_multigene 8:20832584-21179323 pacbio_ccs SMALL 1.0 all -
+L SRR32588720 b2_nogene 8:40502753-40526405,8:28384127-28391287,8:45504296-45506113 pacbio_ccs SMALL 1.0 all -
+L SRR32588720 b2_valley 8:15269280-15305546 pacbio_ccs SMALL 1.0 all -
+L SRR32588726 b2_ordinary 8:10304981-10308771,8:16615798-16675464,8:18010568-18036639,8:25034529-25040762,8:52314542-52350684 pacbio_ccs MID 1.0 all -
+L SRR32588726 b2_deepest 8:13749762-13972736 pacbio_ccs DEEP 0.15 all -
+L SRR32588726 b2_multigene 8:16469721-16769809 pacbio_ccs MID 1.0 all -
+L SRR32588726 b2_nogene 8:28551295-28574739,8:34163831-34166057,8:34080370-34134026 pacbio_ccs SMALL 1.0 all -
+L SRR32588726 b2_valley 8:18449060-18829702 pacbio_ccs MID 1.0 all -
+L SRR33046254 b2_polyarich 8:21104496-21142297,8:8699085-8704430,8:14170567-14183265,8:16758304-16769798,8:22521729-22542545,8:51350453-51367298,8:23678436-23882242 nanopore SMALL 1.0 all NOVEL_UNSPLICED=true,KEEP_NAMES=$F/SRR33046254/b2_polyarich/slice/keep_names.txt
+S SRR32588716 b2_vtg22sub 22:24462404-25048722 pacbio_ccs SMALL 0.02 U3,U8,U11 BLOCK_CAP=1000000,SRC_BAM=/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r/data/vtg.bam
+L SRR33046254 b2_unspliced 8:39866489-39870599,8:40164180-40165081,8:40210398-40288223,8:19196737-19196887,8:18840703-18841950,8:20393250-20414364,8:53537103-53542424,8:28448267-28449782,8:48942470-49044259 nanopore SMALL 1.0 all NOVEL_UNSPLICED=true
+L SRR32588720 b2_unspliced 8:28286000-28304534,8:411977-436137,8:19674369-19676640,8:24788499-24791060,8:28448267-28449782,8:29593986-29595615,8:40325690-40327397 pacbio_ccs SMALL 1.0 all NOVEL_UNSPLICED=true
+L SRR32588720 b2_ownership 8:471342-705660,8:22277198-22515042,8:32801818-32805214,8:44224693-44299247,8:45293743-45328652,8:50942240-51599169 pacbio_ccs SMALL 1.0 all NOVEL_UNSPLICED=true
+L SRR32588720 b2_altends 8:3820134-4327473,8:6880262-7093507,8:11008763-11077230,8:23147218-23179849,8:29742237-29769157,8:30452945-30454096,8:51933983-52230115 pacbio_ccs SMALL 1.0 all NOVEL_UNSPLICED=true
+L SRR32588720 b2_altends_napa 8:3820134-4327473,8:6880262-7093507,8:11008763-11077230,8:23147218-23179849,8:29742237-29769157,8:30452945-30454096,8:51933983-52230115 pacbio_ccs SMALL 1.0 all NOVEL_UNSPLICED=true,EXTRA_IQARGS=--novel_apa
+T
+)
+N=${N:-5}
+echo "$TABLE" | grep -E "$FILT" | { while read W S SL R D RT SUB U E; do
+  RATE=${!RT}
+  ENVS=(); [ "$E" != - ] && IFS=, read -ra ENVS <<< "$E"
+  if [ "$MODE" = local ] && [ "$W" = L ]; then
+    while [ $(jobs -r | wc -l) -ge $N ]; do sleep 5; done
+    echo "local $S $SL"; env "${ENVS[@]}" $H/capture_slice.sh $S $SL $R $D "$RATE" $SUB $U > /dev/null 2>&1 &
+  elif [ "$MODE" = sbatch ]; then
+    mkdir -p $H/logs
+    env "${ENVS[@]}" sbatch -p park,short -t 4:00:00 -c 2 --mem=16G --export=ALL -J iqcap_${S}_${SL} \
+      -o $H/logs/${S}_${SL}.%j.out $H/capture_slice.sh $S $SL $R $D "$RATE" $SUB $U
+  fi
+done; wait; }

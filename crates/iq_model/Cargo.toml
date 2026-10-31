@@ -1,0 +1,22 @@
+[package]
+name = "iq_model"
+description = "U13-U19: model construction, filtering, reassignment, gene joiner, final assignment"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+quirks41 = ["iq_types/quirks41", "iq_annot/quirks41", "iq_assign/quirks41", "iq_graph/quirks41", "iq_terminal/quirks41"]
+
+[dependencies]
+iq_annot.workspace = true
+iq_types.workspace = true
+iq_assign.workspace = true
+iq_graph.workspace = true
+iq_terminal.workspace = true
+rayon.workspace = true
+
+[lints]
+workspace = true

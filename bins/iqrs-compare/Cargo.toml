@@ -1,0 +1,19 @@
+[package]
+name = "iqrs-compare"
+description = "End-to-end scoring of iqrs outputs against IsoQuant reference outputs (design §10.1)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+iq_types.workspace = true
+iq_annot.workspace = true
+lexopt.workspace = true
+anyhow.workspace = true
+flate2.workspace = true
+rustc-hash.workspace = true
+
+[lints]
+workspace = true

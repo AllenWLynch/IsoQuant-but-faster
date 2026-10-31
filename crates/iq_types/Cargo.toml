@@ -1,0 +1,28 @@
+[package]
+name = "iq_types"
+description = "U0: the iqrs contract crate (shared types, BlockStore, IsoformIndex, Params, fixture IO)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Test-only: compiles in the runtime quirk switches that re-enable dropped IsoQuant 4.1
+# behaviours (design §3.0, §9). Never enabled in release builds.
+quirks41 = []
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+flate2.workspace = true
+smallvec.workspace = true
+indexmap.workspace = true
+xxhash-rust.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

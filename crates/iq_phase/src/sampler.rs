@@ -1,4 +1,4 @@
-//! Blocked Gibbs sampler for one locus (phased_model/code/gibbs.py, alpha fixed).
+//! Blocked Gibbs sampler for one locus (phased_model/code/gibbs.py; alpha from --phase-alpha, default 1).
 //!
 //! Model: beta ~ Dir(gamma/T); theta_A, theta_B | beta ~ Dir(alpha beta); rho ~ Beta(a, a);
 //! read r: h_r ~ Bern(rho), t_r | h_r ~ Cat(theta_h) restricted to C_r (l_rt uniform), het

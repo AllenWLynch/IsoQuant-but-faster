@@ -207,7 +207,7 @@ impl RealPipeline {
                 }
                 Some(PhaseState {
                     sites,
-                    cfg: iq_phase::Cfg { burnin: pc.burnin, sweeps: pc.sweeps, ..Default::default() },
+                    cfg: iq_phase::Cfg { burnin: pc.burnin, sweeps: pc.sweeps, alpha: pc.alpha, ..Default::default() },
                     seed: pc.seed,
                     loci: Mutex::new(Vec::new()),
                     vcf_s,

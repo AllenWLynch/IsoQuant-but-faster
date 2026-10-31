@@ -70,6 +70,8 @@ pub struct PhaseConfig {
     pub burnin: u32,
     pub sweeps: u32,
     pub seed: u64,
+    /// Dirichlet concentration of theta_A, theta_B around the shared profile.
+    pub alpha: f64,
 }
 
 /// Runs the whole pipeline.

@@ -4,7 +4,7 @@
 //! - [`vcf`]: phased het SNVs of one sample (GT; A = first allele);
 //! - [`evidence`]: per-read A/B calls with base qualities, collected inline in the read pass;
 //! - [`locus`]: model reads -> loci (gene components) -> read equivalence classes;
-//! - [`sampler`]: blocked Gibbs sampler per locus (phased_model/code/gibbs.py, alpha = 1);
+//! - [`sampler`]: blocked Gibbs sampler per locus (phased_model/code/gibbs.py; alpha from --phase-alpha);
 //! - [`run_loci`] / [`write_outputs`]: rayon over loci and the two TSV outputs.
 
 pub mod evidence;

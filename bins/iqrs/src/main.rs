@@ -63,6 +63,8 @@ PHASED QUANTIFICATION (optional; off unless --phase-vcf is given):
     --phase-sweeps N           Kept Gibbs sweeps per gene [default: 1000]
     --phase-burnin N           Burn-in sweeps per gene [default: 200]
     --phase-seed N             Random seed [default: 1]; results do not depend on --threads
+    --phase-alpha X            Dirichlet concentration tying haplotype A and B isoform
+                               proportions to a shared profile; larger = more shrinkage [default: 1]
     -v, --verbose              Log progress and scheduling decisions to stderr
     -h, --help                 Print this help
     -V, --version              Print the version
@@ -133,6 +135,7 @@ fn parse() -> Result<Option<Config>, Usage> {
     let mut emit_read_assignments = None;
     let (mut phase_vcf, mut phase_sample) = (None, None);
     let (mut phase_sweeps, mut phase_burnin, mut phase_seed) = (1000u32, 200u32, 1u64);
+    let mut phase_alpha = 1.0f64;
     let (mut profile, mut verbose) = (false, false);
     while let Some(arg) = p.next().map_err(|e| Usage(e.to_string()))? {
         match arg {
@@ -212,6 +215,13 @@ fn parse() -> Result<Option<Config>, Usage> {
                     .parse()
                     .map_err(|_| Usage("--phase-seed expects a non-negative integer".into()))?
             }
+            Long("phase-alpha") => {
+                phase_alpha = string(&mut p, "--phase-alpha")?
+                    .parse()
+                    .ok()
+                    .filter(|&x: &f64| x.is_finite() && x > 0.0)
+                    .ok_or_else(|| Usage("--phase-alpha expects a positive number".into()))?
+            }
             Long("params-json") => params_json = Some(PathBuf::from(value(&mut p, "--params-json")?)),
             Long("profile") => profile = true,
             Short('v') | Long("verbose") => verbose = true,
@@ -267,6 +277,7 @@ fn parse() -> Result<Option<Config>, Usage> {
             burnin: phase_burnin,
             sweeps: phase_sweeps,
             seed: phase_seed,
+            alpha: phase_alpha,
         }),
     }))
 }

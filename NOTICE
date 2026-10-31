@@ -1,0 +1,31 @@
+iqrs
+Copyright (C) 2026 the iqrs authors
+
+iqrs is a Rust reimplementation of part of IsoQuant 4.1 (transcript discovery and
+quantification for bulk long-read RNA-seq). Its algorithms, parameters and output formats
+follow the IsoQuant 4.1.0 source code, and it is distributed under the same license, the
+GNU General Public License, version 2 (see LICENSE).
+
+IsoQuant: A universal toolkit for upstream processing of long RNA reads
+https://github.com/ablab/IsoQuant
+Copyright (c) 2022-2026 University of Helsinki
+Copyright (c) 2020-2022 Saint Petersburg State University
+Developed in the Department of Computer Science, University of Helsinki, and the Hagen Tilgner
+Lab, Brain and Mind Research Institute, Weill Cornell Medicine; previously in the Center for
+Algorithmic Biotechnology, Institute of Translational Biomedicine, St. Petersburg State
+University. See the IsoQuant LICENSE file for the full list of contributors.
+
+Bundled third-party data
+------------------------
+crates/iq_terminal/data/model_polya.json and crates/iq_terminal/data/model_tss.json are the
+polyA-site and TSS XGBoost models shipped with IsoQuant 4.1.0
+(isoquant_lib/data/model_polya.json and model_tss.json), copied unmodified and embedded in the
+iqrs binary. They are part of IsoQuant and covered by its copyright and license.
+
+The statically linked Linux (musl) release binaries include mimalloc
+(https://github.com/microsoft/mimalloc), Copyright (c) 2018-2025 Microsoft Corporation and
+Daan Leijen, MIT license, through the Rust `mimalloc` crate (MIT).
+
+iqrs is not affiliated with or endorsed by the IsoQuant authors. If you use iqrs, please cite
+IsoQuant: Prjibelski, Mikheenko et al., Accurate isoform discovery with IsoQuant using long
+reads. Nature Biotechnology 41, 915-918 (2023). https://doi.org/10.1038/s41587-022-01565-y

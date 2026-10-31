@@ -243,7 +243,9 @@ impl EventType {
             InternalPolyaLeft | InternalPolyaRight => 0.5,
             AlternativeTssLeft | AlternativeTssRight => 0.6,
             CorrectPolyaSiteLeft | CorrectPolyaSiteRight | AlignedPolyaTail => 0.0,
-            TerminalSiteMatchLeft | TerminalSiteMatchRight | TerminalSiteMatchLeftPrecise
+            TerminalSiteMatchLeft
+            | TerminalSiteMatchRight
+            | TerminalSiteMatchLeftPrecise
             | TerminalSiteMatchRightPrecise => 0.0,
             Antisense => return Option::None,
         })
@@ -487,10 +489,18 @@ mod tests {
     #[test]
     fn assignment_type_codes() {
         let py: &[(&str, u8)] = &[
-            ("unique", 1), ("noninformative", 0), ("intergenic", 20), ("ambiguous", 10),
-            ("unique_minor_difference", 2), ("inconsistent", 30), ("inconsistent_non_intronic", 31),
-            ("inconsistent_ambiguous", 32), ("inconsistent_genic", 33), ("inconsistent_multigenic", 34),
-            ("discarded", 40), ("suspended", 255),
+            ("unique", 1),
+            ("noninformative", 0),
+            ("intergenic", 20),
+            ("ambiguous", 10),
+            ("unique_minor_difference", 2),
+            ("inconsistent", 30),
+            ("inconsistent_non_intronic", 31),
+            ("inconsistent_ambiguous", 32),
+            ("inconsistent_genic", 33),
+            ("inconsistent_multigenic", 34),
+            ("discarded", 40),
+            ("suspended", 255),
         ];
         check(py, AssignmentType::ALL, AssignmentType::from_py_name, |x| x.code(), AssignmentType::from_code);
     }
@@ -498,9 +508,17 @@ mod tests {
     #[test]
     fn match_class_codes() {
         let py: &[(&str, u8)] = &[
-            ("undefined", 0), ("full_splice_match", 10), ("incomplete_splice_match", 11),
-            ("mono_exon_match", 12), ("novel_in_catalog", 20), ("novel_not_in_catalog", 21),
-            ("genic", 30), ("antisense", 40), ("fusion", 50), ("intergenic", 32), ("genic_intron", 31),
+            ("undefined", 0),
+            ("full_splice_match", 10),
+            ("incomplete_splice_match", 11),
+            ("mono_exon_match", 12),
+            ("novel_in_catalog", 20),
+            ("novel_not_in_catalog", 21),
+            ("genic", 30),
+            ("antisense", 40),
+            ("fusion", 50),
+            ("intergenic", 32),
+            ("genic_intron", 31),
         ];
         check(py, MatchClass::ALL, MatchClass::from_py_name, |x| x.code(), MatchClass::from_code);
     }
@@ -508,31 +526,67 @@ mod tests {
     #[test]
     fn event_type_codes() {
         let py: &[(&str, u16)] = &[
-            ("none", 0), ("undefined", 1), ("mono_exonic", 10), ("antisense", 9), ("fsm", 11),
-            ("ism_left", 15), ("ism_right", 13), ("ism_internal", 14), ("mono_exon_match", 19),
-            ("intron_shift", 21), ("exon_misalignment", 22), ("fake_terminal_exon_left", 24),
-            ("fake_terminal_exon_right", 26), ("terminal_exon_misalignment_right", 28),
-            ("terminal_exon_misalignment_left", 29), ("exon_elongation_left", 25),
-            ("exon_elongation_right", 23), ("intron_retention", 31), ("unspliced_intron_retention", 32),
-            ("incomplete_intron_retention_left", 38), ("incomplete_intron_retention_right", 39),
-            ("fake_micro_intron_retention", 34), ("alt_left_site_known", 101),
-            ("alt_right_site_known", 102), ("alt_left_site_novel", 103), ("alt_right_site_novel", 104),
-            ("extra_intron_novel", 1012), ("extra_intron_known", 1011),
-            ("extra_intron_flanking_left", 1013), ("extra_intron_flanking_right", 1015),
-            ("major_exon_elongation_left", 1005), ("major_exon_elongation_right", 1003),
-            ("intron_migration", 114), ("intron_alternation_novel", 115),
-            ("intron_alternation_known", 116), ("mutually_exclusive_exons_novel", 121),
-            ("mutually_exclusive_exons_known", 122), ("exon_skipping_known", 133),
-            ("exon_skipping_novel", 134), ("exon_merge_known", 135), ("exon_merge_novel", 136),
-            ("exon_gain_known", 145), ("exon_gain_novel", 146), ("exon_detach_known", 147),
-            ("exon_detach_novel", 148), ("terminal_exon_shift_known", 151),
-            ("terminal_exon_shift_novel", 152), ("alternative_structure_novel", 181),
-            ("alternative_structure_known", 182), ("alternative_polya_site_right", 200),
-            ("alternative_polya_site_left", 201), ("internal_polya_left", 202),
-            ("internal_polya_right", 203), ("alternative_tss_left", 204), ("alternative_tss_right", 205),
-            ("correct_polya_site_left", 222), ("correct_polya_site_right", 223),
-            ("aligned_polya_tail", 300), ("terminal_site_match_left", 250),
-            ("terminal_site_match_right", 251), ("terminal_site_match_left_precise", 252),
+            ("none", 0),
+            ("undefined", 1),
+            ("mono_exonic", 10),
+            ("antisense", 9),
+            ("fsm", 11),
+            ("ism_left", 15),
+            ("ism_right", 13),
+            ("ism_internal", 14),
+            ("mono_exon_match", 19),
+            ("intron_shift", 21),
+            ("exon_misalignment", 22),
+            ("fake_terminal_exon_left", 24),
+            ("fake_terminal_exon_right", 26),
+            ("terminal_exon_misalignment_right", 28),
+            ("terminal_exon_misalignment_left", 29),
+            ("exon_elongation_left", 25),
+            ("exon_elongation_right", 23),
+            ("intron_retention", 31),
+            ("unspliced_intron_retention", 32),
+            ("incomplete_intron_retention_left", 38),
+            ("incomplete_intron_retention_right", 39),
+            ("fake_micro_intron_retention", 34),
+            ("alt_left_site_known", 101),
+            ("alt_right_site_known", 102),
+            ("alt_left_site_novel", 103),
+            ("alt_right_site_novel", 104),
+            ("extra_intron_novel", 1012),
+            ("extra_intron_known", 1011),
+            ("extra_intron_flanking_left", 1013),
+            ("extra_intron_flanking_right", 1015),
+            ("major_exon_elongation_left", 1005),
+            ("major_exon_elongation_right", 1003),
+            ("intron_migration", 114),
+            ("intron_alternation_novel", 115),
+            ("intron_alternation_known", 116),
+            ("mutually_exclusive_exons_novel", 121),
+            ("mutually_exclusive_exons_known", 122),
+            ("exon_skipping_known", 133),
+            ("exon_skipping_novel", 134),
+            ("exon_merge_known", 135),
+            ("exon_merge_novel", 136),
+            ("exon_gain_known", 145),
+            ("exon_gain_novel", 146),
+            ("exon_detach_known", 147),
+            ("exon_detach_novel", 148),
+            ("terminal_exon_shift_known", 151),
+            ("terminal_exon_shift_novel", 152),
+            ("alternative_structure_novel", 181),
+            ("alternative_structure_known", 182),
+            ("alternative_polya_site_right", 200),
+            ("alternative_polya_site_left", 201),
+            ("internal_polya_left", 202),
+            ("internal_polya_right", 203),
+            ("alternative_tss_left", 204),
+            ("alternative_tss_right", 205),
+            ("correct_polya_site_left", 222),
+            ("correct_polya_site_right", 223),
+            ("aligned_polya_tail", 300),
+            ("terminal_site_match_left", 250),
+            ("terminal_site_match_right", 251),
+            ("terminal_site_match_left_precise", 252),
             ("terminal_site_match_right_precise", 253),
         ];
         check(py, EventType::ALL, EventType::from_py_name, |x| x.code(), EventType::from_code);
@@ -540,23 +594,57 @@ mod tests {
 
     #[test]
     fn small_enum_codes() {
-        check(&[("known", 1u8), ("novel_in_catalog", 2), ("novel_not_in_catalog", 10)],
-              TranscriptModelType::ALL, TranscriptModelType::from_py_name, |x| x.code(), TranscriptModelType::from_code);
-        check(&[("none", -10i8), ("monoexon_only", 10), ("monoexon_and_fsm", 20), ("all", 30)],
-              AmbiguityResolving::ALL, AmbiguityResolving::from_py_name, |x| x.code(), AmbiguityResolving::from_code);
-        check(&[("only_canonical", 1u8), ("only_stranded", 2), ("all", 3), ("auto", 10)],
-              StrandnessReporting::ALL, StrandnessReporting::from_py_name, |x| x.code(), StrandnessReporting::from_code);
-        check(&[("auto", 1u8), ("never", 2), ("always", 3)],
-              PolyAUsage::ALL, PolyAUsage::from_py_name, |x| x.code(), PolyAUsage::from_code);
-        check(&[("ignore_multimapper", 0u8), ("merge", 1), ("take_best", 2)],
-              MultimapStrategy::ALL, MultimapStrategy::from_py_name, |x| x.code(), MultimapStrategy::from_code);
-        check(&[("none", 1u8), ("all", 2), ("stranded", 3), ("tag", 4), ("list", 5), ("flnc", 6)],
-              PolyATrimmed::ALL, PolyATrimmed::from_py_name, |x| x.code(), PolyATrimmed::from_code);
+        check(
+            &[("known", 1u8), ("novel_in_catalog", 2), ("novel_not_in_catalog", 10)],
+            TranscriptModelType::ALL,
+            TranscriptModelType::from_py_name,
+            |x| x.code(),
+            TranscriptModelType::from_code,
+        );
+        check(
+            &[("none", -10i8), ("monoexon_only", 10), ("monoexon_and_fsm", 20), ("all", 30)],
+            AmbiguityResolving::ALL,
+            AmbiguityResolving::from_py_name,
+            |x| x.code(),
+            AmbiguityResolving::from_code,
+        );
+        check(
+            &[("only_canonical", 1u8), ("only_stranded", 2), ("all", 3), ("auto", 10)],
+            StrandnessReporting::ALL,
+            StrandnessReporting::from_py_name,
+            |x| x.code(),
+            StrandnessReporting::from_code,
+        );
+        check(
+            &[("auto", 1u8), ("never", 2), ("always", 3)],
+            PolyAUsage::ALL,
+            PolyAUsage::from_py_name,
+            |x| x.code(),
+            PolyAUsage::from_code,
+        );
+        check(
+            &[("ignore_multimapper", 0u8), ("merge", 1), ("take_best", 2)],
+            MultimapStrategy::ALL,
+            MultimapStrategy::from_py_name,
+            |x| x.code(),
+            MultimapStrategy::from_code,
+        );
+        check(
+            &[("none", 1u8), ("all", 2), ("stranded", 3), ("tag", 4), ("list", 5), ("flnc", 6)],
+            PolyATrimmed::ALL,
+            PolyATrimmed::from_py_name,
+            |x| x.code(),
+            PolyATrimmed::from_code,
+        );
     }
 
-    fn check<T, C>(py: &[(&str, C)], all: &[T], by_name: fn(&str) -> Option<T>, code: fn(T) -> C,
-                   by_code: fn(C) -> Option<T>)
-    where
+    fn check<T, C>(
+        py: &[(&str, C)],
+        all: &[T],
+        by_name: fn(&str) -> Option<T>,
+        code: fn(T) -> C,
+        by_code: fn(C) -> Option<T>,
+    ) where
         T: Copy + PartialEq + std::fmt::Debug + Serialize + for<'de> Deserialize<'de>,
         C: Copy + PartialEq + std::fmt::Debug + Into<i64>,
     {

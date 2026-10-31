@@ -90,7 +90,9 @@ fn mb(b: u64) -> f64 {
 // ---------------------------------------------------------------------------------------------
 
 fn run_pass_a(bam: &BamHandle, chr: &str, smp: &Sampler) -> Vec<Block> {
-    let tid = bam.ref_id(chr).unwrap_or_else(|| panic!("unknown chr {chr}; have {:?}", &bam.references()[..bam.references().len().min(30)]));
+    let tid = bam
+        .ref_id(chr)
+        .unwrap_or_else(|| panic!("unknown chr {chr}; have {:?}", &bam.references()[..bam.references().len().min(30)]));
     let len = bam.reference_lengths()[tid];
     let cfg = PassAConfig::for_chr(chr, len, 1_000_000, -1); // 4.1 defaults
     let rss0 = rss_bytes();
@@ -162,17 +164,17 @@ fn run_pass_a(bam: &BamHandle, chr: &str, smp: &Sampler) -> Vec<Block> {
 struct BlockStats {
     region: (i64, i64),
     reads: u64,
-    introns: u64,      // Σ introns over reads
-    chains: u64,       // distinct chains (incl. empty)
-    chain_ivs: u64,    // Σ introns over distinct chains
-    singletons: u64,   // chains used by exactly one read
-    mono: u64,         // mono-exon reads
-    names: u64,        // Σ qname bytes
-    dels: u64,         // boundary deletions stored
-    heap: u64,         // BlockStore::heap_bytes() (capacity based, includes Vec slack + names)
-    tight_hot: u64,    // len-based hot columns (no names, no chain table)
-    chain_tbl: u64,    // chain table estimate (flat + offs + pure + hash index)
-    top100: u64,       // reads covered by the 100 most frequent chains
+    introns: u64,    // Σ introns over reads
+    chains: u64,     // distinct chains (incl. empty)
+    chain_ivs: u64,  // Σ introns over distinct chains
+    singletons: u64, // chains used by exactly one read
+    mono: u64,       // mono-exon reads
+    names: u64,      // Σ qname bytes
+    dels: u64,       // boundary deletions stored
+    heap: u64,       // BlockStore::heap_bytes() (capacity based, includes Vec slack + names)
+    tight_hot: u64,  // len-based hot columns (no names, no chain table)
+    chain_tbl: u64,  // chain table estimate (flat + offs + pure + hash index)
+    top100: u64,     // reads covered by the 100 most frequent chains
 }
 
 struct Open {
@@ -288,7 +290,8 @@ fn run_store(bam: &BamHandle, chr: &str, blocks: &[Block], smp: &Sampler, params
             rr.boundary_deletions.clear();
             rr.boundary_deletions.extend_from_slice(&ar.deletions);
             rr.polya = ar.polya;
-            rr.polya_found = ar.polya.ext_a != -1 || ar.polya.ext_t != -1 || ar.polya.int_a != -1 || ar.polya.int_t != -1;
+            rr.polya_found =
+                ar.polya.ext_a != -1 || ar.polya.ext_t != -1 || ar.polya.int_a != -1 || ar.polya.int_t != -1;
             rr.mapped_strand = if r.is_reverse() { Strand::Minus } else { Strand::Plus };
             rr.strand = rr.mapped_strand;
             rr.mapq = r.mapq;

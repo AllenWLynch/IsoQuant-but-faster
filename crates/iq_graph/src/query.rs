@@ -5,7 +5,7 @@
 //! edgeless vertex to `get_overlapping_component_max_coverage`'s scan; callers that need
 //! that must reproduce it. These functions use the graph as captured after `__init__`.
 
-use iq_types::{Iv, IntronGraph, Vertex};
+use iq_types::{IntronGraph, Iv, Vertex};
 use std::collections::{HashSet, VecDeque};
 
 fn count(g: &IntronGraph, v: Vertex) -> u32 {

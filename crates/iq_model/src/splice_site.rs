@@ -82,7 +82,13 @@ fn deleted_bases_in_window(dels: &[(Pos, u32)], low: Pos, high: Pos) -> u32 {
 }
 
 /// `_corrected_site_is_canonical` (upper-cased dinucleotide next to the shifted boundary).
-fn corrected_site_is_canonical(reference: &RefSlice<'_>, boundary: Pos, shift: i32, is_end: bool, strand: Strand) -> bool {
+fn corrected_site_is_canonical(
+    reference: &RefSlice<'_>,
+    boundary: Pos,
+    shift: i32,
+    is_end: bool,
+    strand: Strand,
+) -> bool {
     let corrected = boundary + shift;
     // 0-based start of the dinucleotide; 1-based first base = start0 + 1.
     let start0 = if is_end { corrected } else { corrected - 3 };
@@ -95,9 +101,9 @@ fn corrected_site_is_canonical(reference: &RefSlice<'_>, boundary: Pos, shift: i
     };
     let site = [a.to_ascii_uppercase(), b.to_ascii_uppercase()];
     let valid: &[&[u8; 2]] = match (strand == Strand::Plus, is_end) {
-        (true, true) => &[b"GT", b"GC", b"AT"],  // _FWD_LEFT_SITES
-        (true, false) => &[b"AG", b"AC"],        // _FWD_RIGHT_SITES
-        (false, true) => &[b"CT", b"GT"],        // _REV_LEFT_SITES
+        (true, true) => &[b"GT", b"GC", b"AT"],   // _FWD_LEFT_SITES
+        (true, false) => &[b"AG", b"AC"],         // _FWD_RIGHT_SITES
+        (false, true) => &[b"CT", b"GT"],         // _REV_LEFT_SITES
         (false, false) => &[b"AC", b"GC", b"AT"], // _REV_RIGHT_SITES
     };
     valid.iter().any(|v| **v == site)
@@ -186,7 +192,11 @@ pub fn correct_exon_sites<'r>(
 
 /// `fn correct_model_sites(&TranscriptModel, reads, &RefSlice) -> Option<Vec<Iv>>`
 /// (`_correct_one_model_splice_sites`). Reads with no exons must be left out by the caller.
-pub fn correct_model_sites(model: &TranscriptModel, reads: &[SiteRead<'_>], reference: &RefSlice<'_>) -> Option<Vec<Iv>> {
+pub fn correct_model_sites(
+    model: &TranscriptModel,
+    reads: &[SiteRead<'_>],
+    reference: &RefSlice<'_>,
+) -> Option<Vec<Iv>> {
     correct_exon_sites(&model.exons, model.strand, reads.iter().cloned(), reference)
 }
 
@@ -238,7 +248,6 @@ pub(crate) mod fixture {
     use crate::fixture_util::{compare_stores, StageInput};
     use iq_types::fixture::schema::{RefWin, StageStoreIn, StoreOut, U16CorrectOneIn, U16CorrectOneOut};
     use iq_types::fixture::{FixError, FixResult, FixtureCtx, UnitFixture, Verdict};
-    use iq_types::DevId;
     use std::io::{Read, Seek, SeekFrom};
     use std::path::PathBuf;
 
@@ -261,7 +270,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U16CorrectOne {
         const UNIT: &'static str = "U16";
         const FN: &'static str = "_correct_one_model_splice_sites";
-        const DEVIATIONS: &'static [DevId] = &[];
         type In = U16CorrectOneIn;
         type Out = U16CorrectOneOut;
 
@@ -269,7 +277,11 @@ pub(crate) mod fixture {
             let (start, seq) = stitch(&i.ref_);
             let reference = RefSlice { start, seq: &seq };
             // The hook records reads with exons only (start/end come from exons[0]/[-1]).
-            let reads = i.reads.iter().map(|r| SiteRead { start: r.start, end: r.end, boundary_deletions: &r.boundary_deletions });
+            let reads = i.reads.iter().map(|r| SiteRead {
+                start: r.start,
+                end: r.end,
+                boundary_deletions: &r.boundary_deletions,
+            });
             Ok(U16CorrectOneOut { exons: correct_exon_sites(&i.model.exons, i.model.strand, reads, &reference) })
         }
     }
@@ -323,7 +335,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U16CorrectStore {
         const UNIT: &'static str = "U16";
         const FN: &'static str = "correct_transcript_splice_sites";
-        const DEVIATIONS: &'static [DevId] = &[];
         type In = StageStoreIn;
         type Out = StoreOut;
 

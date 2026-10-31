@@ -212,7 +212,8 @@ pub fn is_counts(n: &str) -> bool {
     n.ends_with("discovered_transcript_counts.tsv") || n.ends_with("discovered_transcript_counts.tsv.gz")
 }
 pub fn is_grouped(n: &str) -> bool {
-    n.contains("discovered_transcript_grouped_") && (n.ends_with("counts.linear.tsv") || n.ends_with("counts.linear.tsv.gz"))
+    n.contains("discovered_transcript_grouped_")
+        && (n.ends_with("counts.linear.tsv") || n.ends_with("counts.linear.tsv.gz"))
 }
 pub fn is_reads(n: &str) -> bool {
     ["transcript_model_reads.tsv", "read_fates.tsv"].iter().any(|s| n.ends_with(s) || n.ends_with(&format!("{s}.gz")))

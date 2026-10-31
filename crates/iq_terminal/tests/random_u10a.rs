@@ -8,35 +8,22 @@
 
 use iq_terminal::peaks::fixture::U10aDetectPeaks;
 use iq_terminal::xgb::fixture::U10aXgbPredict;
-use iq_types::fixture::{
-    read_lines, run_file, Case, FixtureCtx, Registry, RunMode, Summary, UnitFixture,
-};
-use iq_types::DevId;
+use iq_types::fixture::{read_lines, run_file, Case, FixtureCtx, Registry, Summary, UnitFixture};
 use std::path::PathBuf;
 
 fn data(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data")
-        .join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(name)
 }
 
 fn summary(name: &str) -> Summary {
     let path = data(name);
     let mut reg = Registry::new();
     iq_terminal::register_fixtures(&mut reg);
-    let mut ctx = FixtureCtx::open(&path);
-    ctx.mode = if iq_types::QUIRKS41 {
-        RunMode::Parity
-    } else {
-        RunMode::Default
-    };
+    let ctx = FixtureCtx::open(&path);
     let mut s = Summary::new(5);
     run_file(&reg, &path, &ctx, Some("U10a"), &mut s).unwrap();
     for ((u, f), t) in &s.by_key {
-        eprintln!(
-            "{name}: {u} {f}: exact {} explained {:?} mismatch {}",
-            t.exact, t.explained, t.mismatch
-        );
+        eprintln!("{name}: {u} {f}: exact {} explained {:?} mismatch {}", t.exact, t.explained, t.mismatch);
         for (c, d) in &t.examples {
             eprintln!("  {c}\n{d}");
         }
@@ -49,7 +36,7 @@ fn random_native_tie_order() {
     let s = summary("u10a_random_native.jsonl.gz");
     assert!(s.all_ok());
     let t = &s.by_key[&("U10a".to_string(), "detect_peaks_batch".to_string())];
-    assert!(t.exact + t.explained.get(&DevId::T1).copied().unwrap_or(0) >= 600);
+    assert!(t.exact + t.explained.get("D-T1").copied().unwrap_or(0) >= 600);
 }
 
 #[test]
@@ -65,14 +52,12 @@ fn random_stable_bit_exact() {
         let fn_ = c.input["fn"].as_str().unwrap().to_owned();
         if fn_ == "detect_peaks_batch" {
             let i = iq_types::serde_json::from_value(c.input).unwrap();
-            let want: <U10aDetectPeaks as UnitFixture>::Out =
-                iq_types::serde_json::from_value(c.out).unwrap();
+            let want: <U10aDetectPeaks as UnitFixture>::Out = iq_types::serde_json::from_value(c.out).unwrap();
             assert_eq!(U10aDetectPeaks::run(&i, &ctx).unwrap(), want, "{}", c.case);
             n_peaks += 1;
         } else {
             let i = iq_types::serde_json::from_value(c.input).unwrap();
-            let want: <U10aXgbPredict as UnitFixture>::Out =
-                iq_types::serde_json::from_value(c.out).unwrap();
+            let want: <U10aXgbPredict as UnitFixture>::Out = iq_types::serde_json::from_value(c.out).unwrap();
             assert_eq!(U10aXgbPredict::run(&i, &ctx).unwrap(), want, "{}", c.case);
             n_xgb += 1;
         }
@@ -99,7 +84,7 @@ fn tie_checker_accepts_other_orders_and_rejects_corruption() {
             if alt != got {
                 alt_differs += 1;
                 let v = compare_batch(&got, &alt);
-                assert!(v == Verdict::Exact || v == Verdict::Explained(DevId::T1), "{}: {v:?}", c.case);
+                assert!(v == Verdict::Exact || v == Verdict::Explained("D-T1"), "{}: {v:?}", c.case);
             }
             // Corruptions that no tie order explains.
             let mut bad = alt.clone();

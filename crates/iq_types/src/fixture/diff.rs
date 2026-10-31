@@ -190,7 +190,11 @@ pub fn diff_json(got: &Value, want: &Value, opts: &DiffOptions) -> Option<Diff> 
 }
 
 /// Field-level diff of any two serializable values (typically fixture DTOs).
-pub fn diff_values<G: Serialize + ?Sized, W: Serialize + ?Sized>(got: &G, want: &W, opts: &DiffOptions) -> Option<Diff> {
+pub fn diff_values<G: Serialize + ?Sized, W: Serialize + ?Sized>(
+    got: &G,
+    want: &W,
+    opts: &DiffOptions,
+) -> Option<Diff> {
     match (serde_json::to_value(got), serde_json::to_value(want)) {
         (Ok(g), Ok(w)) => diff_json(&g, &w, opts),
         (Err(e), _) | (_, Err(e)) => Some(Diff::error(format!("serialize for diff: {e}"))),

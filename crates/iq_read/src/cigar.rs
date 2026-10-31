@@ -56,16 +56,17 @@ pub fn read_blocks_into(
     let mut open: Option<(i64, i64, usize)> = None;
     let mut has_match = false;
 
-    let mut close = |open: &mut Option<(i64, i64, usize)>, has_match: &mut bool, ref_pos: i64, read_pos: i64, idx: usize| {
-        if let Some((rs, qs, cs)) = open.take() {
-            if *has_match {
-                ref_blocks.push(Iv::new(rs as Pos, (ref_pos - 1) as Pos));
-                read_blocks.push((qs as i32, (read_pos - 1) as i32));
-                cigar_blocks.push((cs as i32, idx as i32 - 1));
+    let mut close =
+        |open: &mut Option<(i64, i64, usize)>, has_match: &mut bool, ref_pos: i64, read_pos: i64, idx: usize| {
+            if let Some((rs, qs, cs)) = open.take() {
+                if *has_match {
+                    ref_blocks.push(Iv::new(rs as Pos, (ref_pos - 1) as Pos));
+                    read_blocks.push((qs as i32, (read_pos - 1) as i32));
+                    cigar_blocks.push((cs as i32, idx as i32 - 1));
+                }
             }
-        }
-        *has_match = false;
-    };
+            *has_match = false;
+        };
 
     for (idx, &w) in cigar.iter().enumerate() {
         let (op, len) = cigar_decode(w);

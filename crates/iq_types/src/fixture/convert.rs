@@ -7,11 +7,11 @@
 use super::ids::{IdMaps, TxSpace};
 use super::schema::*;
 use crate::assign::{Assignment, IsoformMatch, MatchEvent};
+use crate::enums::TranscriptModelType;
 use crate::index::{GeneRec, IsoRec, IsoformIndex, ProfMatrix};
 use crate::model::{IntronGraph, ModelKind, ModelStore, PathStorage, TranscriptModel};
 use crate::prim::{junctions_from_blocks, Iv, Strand};
 use crate::read::ReadRecord;
-use crate::enums::TranscriptModelType;
 use indexmap::IndexMap;
 use rustc_hash::FxHashMap;
 
@@ -236,7 +236,12 @@ fn ranges(r: &Pairs<String, (i32, i32)>) -> FxHashMap<&str, (u32, u32)> {
     r.iter().map(|(k, v)| (k.as_str(), (v.0.max(0) as u32, v.1.max(0) as u32))).collect()
 }
 
-fn prof_matrix(names: &[&str], profiles: &Pairs<String, Vec<i8>>, n_feat: usize, what: &str) -> Result<ProfMatrix, String> {
+fn prof_matrix(
+    names: &[&str],
+    profiles: &Pairs<String, Vec<i8>>,
+    n_feat: usize,
+    what: &str,
+) -> Result<ProfMatrix, String> {
     let by: FxHashMap<&str, &Vec<i8>> = profiles.iter().map(|(k, v)| (k.as_str(), v)).collect();
     let mut m = ProfMatrix::new(names.len(), n_feat);
     for (i, t) in names.iter().enumerate() {
@@ -344,7 +349,8 @@ impl StoreFixture {
             st.models.push(core);
             ex.models.push(mex);
         }
-        let check = |r: u32| if (r as usize) < n { Ok(r) } else { Err(format!("read_idx {r} out of range ({n} reads)")) };
+        let check =
+            |r: u32| if (r as usize) < n { Ok(r) } else { Err(format!("read_idx {r} out of range ({n} reads)")) };
         for (id, reads) in &self.transcript_read_ids {
             let k = ids.models.intern(id);
             st.transcript_read_ids.insert(k, reads.iter().map(|&r| check(r)).collect::<Result<_, _>>()?);
@@ -428,10 +434,17 @@ impl StoreFixture {
             transcript_read_ids: st.transcript_read_ids.iter().map(|(k, v)| (model_name(*k), v.clone())).collect(),
             internal_counter: st.internal_counter.iter().map(|(k, v)| (model_name(*k), *v as i64)).collect(),
             read_assignment_counts: rac_idx.iter().map(|(i, c)| (read_names[*i as usize].to_owned(), *c)).collect(),
-            construction_assignment: ca_idx.iter().map(|(i, m)| (read_names[*i as usize].to_owned(), m.clone())).collect(),
+            construction_assignment: ca_idx
+                .iter()
+                .map(|(i, m)| (read_names[*i as usize].to_owned(), m.clone()))
+                .collect(),
             read_assignment_counts_idx: Some(rac_idx),
             construction_assignment_idx: Some(ca_idx),
-            nonfl_known_reads: st.nonfl_known_reads.iter().map(|(k, v)| (ids.txs.resolve(*k).to_owned(), v.clone())).collect(),
+            nonfl_known_reads: st
+                .nonfl_known_reads
+                .iter()
+                .map(|(k, v)| (ids.txs.resolve(*k).to_owned(), v.clone()))
+                .collect(),
             detected_known_isoforms: ex.detected_known_isoforms.clone(),
             id_counter: ex.id_counter,
         }
@@ -443,7 +456,11 @@ impl StoreFixture {
 /// `internal_counter` exactly in order of keys but ignoring zero-valued entries; the
 /// per-read maps as sets of non-zero (`*_idx`) entries. `id_counter` is ignored (IDs need
 /// not match, D-M1).
-pub fn store_diff(got: &StoreFixture, want: &StoreFixture, opts: &super::diff::DiffOptions) -> Option<super::diff::Diff> {
+pub fn store_diff(
+    got: &StoreFixture,
+    want: &StoreFixture,
+    opts: &super::diff::DiffOptions,
+) -> Option<super::diff::Diff> {
     #[derive(serde::Serialize)]
     struct View<'a> {
         models: &'a [ModelFixture],
@@ -517,7 +534,11 @@ impl U12FillOut {
         PathStorage {
             paths: self.paths.iter().map(|(p, c)| (p.clone().into_boxed_slice(), *c)).collect(),
             fl_paths: self.fl_paths.iter().map(|p| p.clone().into_boxed_slice()).collect(),
-            paths_to_reads: self.paths_to_reads.iter().map(|(p, r)| (p.clone().into_boxed_slice(), r.clone())).collect(),
+            paths_to_reads: self
+                .paths_to_reads
+                .iter()
+                .map(|(p, r)| (p.clone().into_boxed_slice(), r.clone()))
+                .collect(),
             known_isoforms_in_graph: IndexMap::new(),
         }
     }

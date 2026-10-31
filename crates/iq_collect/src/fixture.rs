@@ -1,10 +1,10 @@
 //! Fixture runners: U8 `collect_block` and U9 `resolve`.
 //!
 //! U8 runs from real BAM records. It fetches the block region from the capture's slice BAM
-//! (`<capdir>/slice/*.bam`, HP tag decoded) and builds the block index live from the GFF3 (`iq_annot`,
-//! D-R1 gate in `genes_for_region0`; `IQRS_U8_INDEX=dump` uses the captured dump instead).
+//! (`<capdir>/slice/*.bam`, HP tag decoded) and builds the block index live from the GFF3 (`iq_annot`;
+//! `IQRS_U8_INDEX=dump` uses the captured dump instead).
 //! The reference is the whole chromosome from `data/ref/genome.fa` (`$IQRS_REFERENCE`).
-//! Ownership (4.1 fetch window, as in both builds since D-R2 was retired) is decided among
+//! Ownership (4.1 fetch window) is decided among
 //! all U8 block regions of the same chromosome in the capture. `assignment_id` (a 4.1 global counter, also advanced by dropped reads) is
 //! not compared.
 
@@ -21,7 +21,7 @@ use iq_types::fixture::{
     Verdict,
 };
 use iq_types::serde::Deserialize;
-use iq_types::{Block, BlockStore, DevId, IsoformIndex, Iv0, Params, RecordLite, RefSlice};
+use iq_types::{Block, BlockStore, IsoformIndex, Iv0, Params, RecordLite, RefSlice};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -134,7 +134,13 @@ fn sibling_regions(ctx: &FixtureCtx, chr: &str) -> FixResult<Arc<Vec<(u32, Iv0)>
 }
 
 /// Block index: live from the annotation (default) or the captured dump.
-pub fn block_index(ctx: &FixtureCtx, chr: &str, region: Iv0, dump_sha: &str, delta: i32) -> FixResult<Arc<IsoformIndex>> {
+pub fn block_index(
+    ctx: &FixtureCtx,
+    chr: &str,
+    region: Iv0,
+    dump_sha: &str,
+    delta: i32,
+) -> FixResult<Arc<IsoformIndex>> {
     if std::env::var("IQRS_U8_INDEX").is_ok_and(|v| v == "dump") {
         return ctx.index(dump_sha);
     }
@@ -184,16 +190,27 @@ impl U8Prepared {
     }
 
     /// Collects the block; returns the store, stats and (if `timed`) stage times.
-    pub fn collect(&self, ctx: &FixtureCtx, parallel: bool, timed: bool) -> (BlockStore, CollectStats, Option<StageTimes>) {
+    pub fn collect(
+        &self,
+        ctx: &FixtureCtx,
+        parallel: bool,
+        timed: bool,
+    ) -> (BlockStore, CollectStats, Option<StageTimes>) {
         let i = &self.input;
         let reference = RefSlice { start: 1, seq: &self.seq };
         let owner = ClusterOwner { regions: &self.regions, me: self.me };
-        let block =
-            Block { region: i.region, max_cov: i.max_coverage as u32, skip: i.skip_read_fraction, gene_ids: Vec::new(), owned_reads: 0 };
+        let block = Block {
+            region: i.region,
+            max_cov: i.max_coverage as u32,
+            skip: i.skip_read_fraction,
+            gene_ids: Vec::new(),
+            owned_reads: 0,
+        };
         let groups = FnGroups(|t: Option<&iq_types::TagValue>| {
             ctx.ids().group_id(&[iq_read::groups::group_string(t).into_owned()])
         });
-        let mut c = BlockCollector::new(&block, &self.index, &reference, &self.params, &owner, &groups).parallel(parallel);
+        let mut c =
+            BlockCollector::new(&block, &self.index, &reference, &self.params, &owner, &groups).parallel(parallel);
         if timed {
             c = c.timed();
         }
@@ -225,7 +242,6 @@ pub struct U8Collect;
 impl UnitFixture for U8Collect {
     const UNIT: &'static str = "U8";
     const FN: &'static str = "collect_block";
-    const DEVIATIONS: &'static [DevId] = &[DevId::R1, DevId::P1, DevId::P3, DevId::A3, DevId::A4];
     type In = U8CollectBlockIn;
     type Out = U8CollectBlockOut;
 
@@ -260,7 +276,6 @@ pub struct U9Resolve;
 impl UnitFixture for U9Resolve {
     const UNIT: &'static str = "U9";
     const FN: &'static str = "resolve";
-    const DEVIATIONS: &'static [DevId] = &[DevId::C1];
     type In = U9ResolveIn;
     type Out = U9ResolveOut;
 

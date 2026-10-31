@@ -1,8 +1,7 @@
 //! Read ownership (design §5.2).
 //!
 //! 4.1 re-fetches every split region, so a record overlapping two blocks is processed in
-//! both, and both builds of iqrs do the same since D-R2 was retired
-//! (`validation/deviation_effects.md`; U8 decides with the fetch window, see
+//! both, and iqrs does the same (U8 decides with the fetch window, see
 //! `iq_collect::ClusterOwner`). The single **owner block** (largest overlap with
 //! `[pos0, end0 - 1]`, ties to the earlier block) remains as a partition of the reads for
 //! cost estimates: pass A counts owned primary records per block without storing reads (see
@@ -175,7 +174,8 @@ mod tests {
                 oc.hist[(mid_key(s, e) - base) as usize] += 1;
             }
         }
-        let splits = split_coverage_regions(region, &CoverageBins { first_bin: b_lo, counts: &cov }, reads.len() as u64);
+        let splits =
+            split_coverage_regions(region, &CoverageBins { first_bin: b_lo, counts: &cov }, reads.len() as u64);
         let rg: Vec<Iv0> = splits.iter().map(|x| x.0).collect();
         // contiguity of the regions that makes the midpoint rule exact
         for w in rg.windows(2) {

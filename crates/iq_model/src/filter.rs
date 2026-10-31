@@ -34,8 +34,8 @@ use crate::fl::is_matching_assignment;
 use iq_assign::profile::{ProfileBuilder, Scratch};
 use iq_types::indexmap::IndexMap;
 use iq_types::{
-    vertex_code, AssignmentType, CombinedProfile, GeneKey, IntronGraph, Iv, ModelIdx, ModelKind, ModelStore, PolyAInfo, Pos,
-    ReadIdx, Strand, TranscriptModel, Vertex, NO_POLYA,
+    vertex_code, AssignmentType, CombinedProfile, GeneKey, IntronGraph, Iv, ModelIdx, ModelKind, ModelStore, PolyAInfo,
+    Pos, ReadIdx, Strand, TranscriptModel, Vertex, NO_POLYA,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -249,7 +249,11 @@ fn spans_overlap(a: &TranscriptModel, b: &TranscriptModel) -> bool {
 
 /// `detect_similar_isoforms(models, remove_unconfirmed)` → `to_substitute` (inner → outer) in
 /// 4.1 dict order.
-pub fn detect_similar_isoforms(models: &[TranscriptModel], ctx: &Ctx<'_>, remove_unconfirmed: bool) -> IndexMap<ModelIdx, ModelIdx> {
+pub fn detect_similar_isoforms(
+    models: &[TranscriptModel],
+    ctx: &Ctx<'_>,
+    remove_unconfirmed: bool,
+) -> IndexMap<ModelIdx, ModelIdx> {
     detect_similar_cached(models, ctx, remove_unconfirmed, &mut SimilarCache::default())
 }
 
@@ -288,7 +292,8 @@ pub fn detect_similar_cached(
             need |= spans_overlap(m, outer) && !cache.pairs.contains_key(&(outer.key, m.key));
         }
         if need {
-            let index = iq_annot::index_from_models(ctx.index.chr, std::slice::from_ref(outer), ctx.params.matching.delta);
+            let index =
+                iq_annot::index_from_models(ctx.index.chr, std::slice::from_ref(outer), ctx.params.matching.delta);
             let builder = ProfileBuilder::new(&index, &ctx.params.matching);
             for &i in &cands {
                 let m = &models[i];
@@ -528,10 +533,14 @@ pub(crate) mod fixture {
             let mut ids = self.ids.borrow_mut();
             let (want_in, _) = i.model.to_core(&mut ids);
             if want_in != *model {
-                self.errors.borrow_mut().push(format!("{}: input model differs: got {model:?}, want {want_in:?}", c.case));
+                self.errors
+                    .borrow_mut()
+                    .push(format!("{}: input model differs: got {model:?}, want {want_in:?}", c.case));
             }
             if i.reads != reads {
-                self.errors.borrow_mut().push(format!("{}: input reads differ: got {reads:?}, want {:?}", c.case, i.reads));
+                self.errors
+                    .borrow_mut()
+                    .push(format!("{}: input reads differ: got {reads:?}, want {:?}", c.case, i.reads));
             }
             *model = o.model.to_core(&mut ids).0;
         }
@@ -563,12 +572,16 @@ pub(crate) mod fixture {
 
     /// Store comparison modulo `internal_counter` zero entries and `next_key`.
     fn store_core_diff(got: &ModelStore, want: &ModelStore) -> Option<String> {
-        let nz = |s: &ModelStore| s.internal_counter.iter().filter(|e| *e.1 != 0).map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
+        let nz =
+            |s: &ModelStore| s.internal_counter.iter().filter(|e| *e.1 != 0).map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
         if got.models != want.models {
             return Some(format!("models: got {:?}, want {:?}", got.models, want.models));
         }
         if got.transcript_read_ids != want.transcript_read_ids {
-            return Some(format!("transcript_read_ids: got {:?}, want {:?}", got.transcript_read_ids, want.transcript_read_ids));
+            return Some(format!(
+                "transcript_read_ids: got {:?}, want {:?}",
+                got.transcript_read_ids, want.transcript_read_ids
+            ));
         }
         if nz(got) != nz(want) {
             return Some(format!("internal_counter: got {:?}, want {:?}", nz(got), nz(want)));
@@ -638,7 +651,8 @@ pub(crate) mod fixture {
             let mut ids = ctx.ids().clone();
             ids.reset_block();
             let models: Vec<TranscriptModel> = input.models.iter().map(|m| m.to_core(&mut ids).0).collect();
-            let name: HashMap<ModelIdx, &str> = models.iter().zip(&input.models).map(|(m, f)| (m.key, f.id.as_str())).collect();
+            let name: HashMap<ModelIdx, &str> =
+                models.iter().zip(&input.models).map(|(m, f)| (m.key, f.id.as_str())).collect();
             let graph = IntronGraph::default();
             let paths = iq_types::PathStorage::default();
             let preds = Predictions::default();
@@ -653,7 +667,9 @@ pub(crate) mod fixture {
                 assigner: &assigner,
             };
             let ts = detect_similar_isoforms(&models, &c, input.remove_unconfirmed);
-            Ok(U15aDetectSimilarOut { to_substitute: ts.iter().map(|(a, b)| (name[a].to_owned(), name[b].to_owned())).collect() })
+            Ok(U15aDetectSimilarOut {
+                to_substitute: ts.iter().map(|(a, b)| (name[a].to_owned(), name[b].to_owned())).collect(),
+            })
         }
     }
 }
@@ -712,7 +728,8 @@ mod tests {
     impl Env {
         fn new(recs: &[ReadRecord], graph: IntronGraph) -> Self {
             let params = Params::ont();
-            let assigner = LiveAssigner { params: AssignParams::new(params.matching.clone(), params.splice.clone(), false) };
+            let assigner =
+                LiveAssigner { params: AssignParams::new(params.matching.clone(), params.splice.clone(), false) };
             Env {
                 params,
                 index: IsoformIndex::default(),
@@ -822,9 +839,9 @@ mod tests {
         let ex = [(100, 200), (300, 400), (500, 600), (700, 800)];
         let mut models = vec![
             model(0, ModelKind::Nnic, &ex),
-            model(1, ModelKind::Nnic, &ex),                                          // identical -> matching
-            model(2, ModelKind::Nnic, &ex[1..]),                                    // truncated
-            model(3, ModelKind::Nnic, &[(100, 200), (300, 400), (700, 800)]),       // exon skip
+            model(1, ModelKind::Nnic, &ex),      // identical -> matching
+            model(2, ModelKind::Nnic, &ex[1..]), // truncated
+            model(3, ModelKind::Nnic, &[(100, 200), (300, 400), (700, 800)]), // exon skip
             model(4, ModelKind::Nnic, &[(10000, 10100), (10200, 10300), (10400, 10500)]), // far away
         ];
         let mut cache = SimilarCache::default();

@@ -1,7 +1,6 @@
 //! `iqrs-compare`: end-to-end scoring of two IsoQuant-format output sets (design §10.1).
 //!
-//! Any two of IsoQuant 4.1, iqrs parity mode (`--gene-types isoquant`) and iqrs default mode can
-//! be compared. Models are matched by structure only (transcript and gene IDs are never assumed
+//! Any two output sets (IsoQuant 4.1, iqrs, or two iqrs runs) can be compared. Models are matched by structure only (transcript and gene IDs are never assumed
 //! to correspond): multi-exon by `(chr, strand, exact intron chain)`, mono-exon by same-strand
 //! reciprocal overlap >= 0.8.
 //!
@@ -11,7 +10,8 @@
 //!                                    *transcript_model_reads.tsv[.gz] or *read_fates.tsv[.gz])
 //!   --no-reads                       skip per-read files
 //!   --annotation F                   GFF3/GTF: structural known/NIC/NNIC classes and locus categories
-//!   --mode parity|default            default: exclude D-A1 loci (gene type != gene) from gated metrics
+//!   --exclude-nongene-loci           exclude loci whose GFF3 gene type is not `gene` from gated metrics
+//!                                    (for a `--gene-types all` run vs IsoQuant 4.1; needs --annotation)
 //!   --noise-floor F                  compare.json of a noise-floor comparison; thresholds widened by its deficits
 //!   --ref-label S / --test-label S   names used in the report
 //!   --top N                          residual rows in the markdown (default 40)
@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 const USAGE: &str = "usage: iqrs-compare --ref DIR --test DIR [--ref-reads F] [--test-reads F] [--no-reads] \
-[--annotation GFF3|GTF] [--mode parity|default] [--noise-floor compare.json] [--ref-label S] [--test-label S] \
+[--annotation GFF3|GTF] [--exclude-nongene-loci] [--noise-floor compare.json] [--ref-label S] [--test-label S] \
 [--top N] [-o OUTDIR] [--explained METRIC=DEV]... [--fail-on-gate]";
 
 struct Args {
@@ -47,7 +47,7 @@ struct Args {
     tr: Option<PathBuf>,
     no_reads: bool,
     annotation: Option<PathBuf>,
-    default_mode: bool,
+    exclude_nongene: bool,
     floor: Option<PathBuf>,
     rl: String,
     tl: String,
@@ -68,7 +68,7 @@ fn parse_args() -> Result<Args> {
         tr: None,
         no_reads: false,
         annotation: None,
-        default_mode: false,
+        exclude_nongene: false,
         floor: None,
         rl: String::new(),
         tl: String::new(),
@@ -85,13 +85,7 @@ fn parse_args() -> Result<Args> {
             Long("test-reads") => a.tr = Some(p.value()?.into()),
             Long("no-reads") => a.no_reads = true,
             Long("annotation") => a.annotation = Some(p.value()?.into()),
-            Long("mode") => {
-                a.default_mode = match p.value()?.string()?.as_str() {
-                    "parity" => false,
-                    "default" => true,
-                    m => bail!("--mode must be parity or default, got {m}"),
-                }
-            }
+            Long("exclude-nongene-loci") => a.exclude_nongene = true,
             Long("noise-floor") => a.floor = Some(p.value()?.into()),
             Long("ref-label") => a.rl = p.value()?.string()?,
             Long("test-label") => a.tl = p.value()?.string()?,
@@ -193,7 +187,17 @@ fn main() -> Result<()> {
         sclass = Some(sv);
     }
 
-    let ctx = metrics::Ctx { r: &rs, t: &ts, mt: &mt, chroms: &chroms, cat, cats, sclass, default_mode: a.default_mode, top: a.top };
+    let ctx = metrics::Ctx {
+        r: &rs,
+        t: &ts,
+        mt: &mt,
+        chroms: &chroms,
+        cat,
+        cats,
+        sclass,
+        exclude_nongene: a.exclude_nongene,
+        top: a.top,
+    };
     let mut rep = Report {
         title: format!("iqrs-compare: {} vs {}", a.rl, a.tl),
         explained: a.explained.clone(),
@@ -202,12 +206,12 @@ fn main() -> Result<()> {
     rep.header_lines.push(format!("ref: `{}`", rs.dir.display()));
     rep.header_lines.push(format!("test: `{}`", ts.dir.display()));
     rep.header_lines.push(format!(
-        "mode: {}{}",
-        if a.default_mode { "default (D-A1 loci excluded from gated metrics)" } else { "parity (all loci gated)" },
+        "gated loci: {}{}",
+        if a.exclude_nongene { "gene type `gene` and intergenic only" } else { "all" },
         a.annotation.as_ref().map(|p| format!("; annotation `{}`", p.display())).unwrap_or_default()
     ));
-    if a.default_mode && ctx.cat.is_none() {
-        rep.warnings.push("--mode default without --annotation: D-A1 loci cannot be identified, all loci gated".into());
+    if a.exclude_nongene && ctx.cat.is_none() {
+        rep.warnings.push("--exclude-nongene-loci without --annotation: locus types unknown, all loci gated".into());
     }
     for (s, side) in [("ref", &rs), ("test", &ts)] {
         for w in &side.warnings {
@@ -238,11 +242,7 @@ fn main() -> Result<()> {
             rep.warnings.push(format!("--explained {m}={d}: no gated metric matches"));
         }
     }
-    rep.header_lines.push(format!(
-        "time: load {:.2}s, total {:.2}s",
-        t_load.as_secs_f64(),
-        t0.elapsed().as_secs_f64()
-    ));
+    rep.header_lines.push(format!("time: load {:.2}s, total {:.2}s", t_load.as_secs_f64(), t0.elapsed().as_secs_f64()));
     let md = rep.markdown();
     match &a.out {
         Some(o) => {
@@ -251,7 +251,11 @@ fn main() -> Result<()> {
             std::fs::write(o.join("compare.json"), report::to_pretty(&rep.json()))?;
             std::fs::write(o.join("compare.tsv"), rep.tsv())?;
             std::fs::write(o.join("mismatches.tsv"), mismatches)?;
-            eprintln!("iqrs-compare: gated metrics {}; wrote {}/{{summary.md,compare.json,compare.tsv,mismatches.tsv}}", rep.gate_line(), o.display());
+            eprintln!(
+                "iqrs-compare: gated metrics {}; wrote {}/{{summary.md,compare.json,compare.tsv,mismatches.tsv}}",
+                rep.gate_line(),
+                o.display()
+            );
         }
         None => print!("{md}"),
     }

@@ -490,7 +490,8 @@ impl Pipeline for MockPipeline {
             amb += outs[c].ambiguous;
             nf += outs[c].no_feature;
         }
-        let _ = write!(counts, "__ambiguous\t{amb}\n__no_feature\t{nf}\n__totals\t{}\t{}\n", totals.total, totals.polya);
+        let _ =
+            write!(counts, "__ambiguous\t{amb}\n__no_feature\t{nf}\n__totals\t{}\t{}\n", totals.total, totals.polya);
         if let Some(d) = &self.spec.out_dir {
             std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
             std::fs::write(d.join("OUT.gtf"), &gtf).map_err(|e| e.to_string())?;

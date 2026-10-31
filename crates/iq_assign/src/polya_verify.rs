@@ -6,7 +6,7 @@
 //! by a polyA-site event, and terminal-exon misalignments may be appended.
 
 use iq_types::params::MatchingParams;
-use iq_types::{Events, EventType, IsoformIndex, Iv, MatchEvent, PolyAInfo, Strand};
+use iq_types::{EventType, Events, IsoformIndex, Iv, MatchEvent, PolyAInfo, Strand};
 
 /// `math.inf` stand-in for absent polyA distances (all real distances are far smaller).
 const INF: i64 = i64::MAX;
@@ -74,13 +74,23 @@ impl<'a> PolyAVerifier<'a> {
         let iso_exons = self.index.iso_exons(iso);
         match self.index.iso[iso].strand {
             Strand::Plus => {
-                let is_internal = check_internal(polya.int_a, events, EventType::IncompleteIntronRetentionRight, EventType::InternalPolyaRight);
+                let is_internal = check_internal(
+                    polya.int_a,
+                    events,
+                    EventType::IncompleteIntronRetentionRight,
+                    EventType::InternalPolyaRight,
+                );
                 if !is_internal && (polya.ext_a != -1 || polya.int_a != -1) {
                     self.verify_polya(iso_exons, read_exons, polya, events);
                 }
             }
             Strand::Minus => {
-                let is_internal = check_internal(polya.int_t, events, EventType::IncompleteIntronRetentionLeft, EventType::InternalPolyaLeft);
+                let is_internal = check_internal(
+                    polya.int_t,
+                    events,
+                    EventType::IncompleteIntronRetentionLeft,
+                    EventType::InternalPolyaLeft,
+                );
                 if !is_internal && (polya.ext_t != -1 || polya.int_t != -1) {
                     self.verify_polyt(iso_exons, read_exons, polya, events);
                 }
@@ -175,7 +185,13 @@ impl<'a> PolyAVerifier<'a> {
     }
 
     /// `detect_reference_exons_beyond_polya` (`:312-338`).
-    fn detect_reference_exons_beyond_polya(&self, iso_exons: &[Iv], ext: i64, int: i64, events: &mut Events) -> (i64, i64) {
+    fn detect_reference_exons_beyond_polya(
+        &self,
+        iso_exons: &[Iv],
+        ext: i64,
+        int: i64,
+        events: &mut Events,
+    ) -> (i64, i64) {
         let n = iso_exons.len();
         let polya_pos = if int != -1 { int } else { ext };
         let mut cnt = 0usize;
@@ -191,7 +207,11 @@ impl<'a> PolyAVerifier<'a> {
         if self.short_terminal_exons(term_len, dist) {
             for i in 0..cnt {
                 let r = n as i64 - 2 - i as i64;
-                events.push(MatchEvent::with_regions(EventType::TerminalExonMisalignmentRight, (r, r), iq_types::match_consts::UNDEFINED_REGION));
+                events.push(MatchEvent::with_regions(
+                    EventType::TerminalExonMisalignmentRight,
+                    (r, r),
+                    iq_types::match_consts::UNDEFINED_REGION,
+                ));
             }
             let end = iso_exons[n - 1].e as i64;
             return (end, end);
@@ -200,7 +220,13 @@ impl<'a> PolyAVerifier<'a> {
     }
 
     /// `detect_reference_exons_before_polyt` (`:341-367`).
-    fn detect_reference_exons_before_polyt(&self, iso_exons: &[Iv], ext: i64, int: i64, events: &mut Events) -> (i64, i64) {
+    fn detect_reference_exons_before_polyt(
+        &self,
+        iso_exons: &[Iv],
+        ext: i64,
+        int: i64,
+        events: &mut Events,
+    ) -> (i64, i64) {
         let n = iso_exons.len();
         let polyt_pos = if int != -1 { int } else { ext };
         let mut cnt = 0usize;
@@ -215,7 +241,11 @@ impl<'a> PolyAVerifier<'a> {
         let dist = (anchor - ext).abs().min((anchor - int).abs());
         if self.short_terminal_exons(term_len, dist) {
             for i in 0..cnt as i64 {
-                events.push(MatchEvent::with_regions(EventType::TerminalExonMisalignmentLeft, (i, i), iq_types::match_consts::UNDEFINED_REGION));
+                events.push(MatchEvent::with_regions(
+                    EventType::TerminalExonMisalignmentLeft,
+                    (i, i),
+                    iq_types::match_consts::UNDEFINED_REGION,
+                ));
             }
             let start = iso_exons[0].s as i64;
             return (start, start);
@@ -254,7 +284,12 @@ fn check_internal(pos: i32, events: &mut Events, retention: EventType, internal:
         return false;
     }
     if let Some(e) = events.iter().find(|e| e.ty == retention) {
-        let ev = MatchEvent { ty: internal, iso_region: e.iso_region, read_region: iq_types::match_consts::UNDEFINED_REGION, info: pos as i64 };
+        let ev = MatchEvent {
+            ty: internal,
+            iso_region: e.iso_region,
+            read_region: iq_types::match_consts::UNDEFINED_REGION,
+            info: pos as i64,
+        };
         events.push(ev);
         return true;
     }

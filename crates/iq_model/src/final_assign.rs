@@ -201,7 +201,9 @@ pub fn for_each_final<T: Send>(
     }
     let chr = ctx.index.chr;
     let delta = ctx.params.matching.delta;
-    let build = |(i, &need): (usize, &bool)| need.then(|| iq_annot::index_from_models(chr, std::slice::from_ref(&ms.models[i]), delta));
+    let build = |(i, &need): (usize, &bool)| {
+        need.then(|| iq_annot::index_from_models(chr, std::slice::from_ref(&ms.models[i]), delta))
+    };
     let n_needed = needed.iter().filter(|&&b| b).count();
     let single_idx: Vec<Option<IsoformIndex>> = if n_needed >= 8 && par_threshold != usize::MAX {
         needed.par_iter().enumerate().map(build).collect()
@@ -290,7 +292,7 @@ pub(crate) mod fixture {
     use crate::fixture_util::StageInput;
     use iq_types::fixture::schema::{AssignmentFixture, StageStoreIn, U19AssignmentsOut, U19ReadAssignment};
     use iq_types::fixture::{FixError, FixResult, FixtureCtx, UnitFixture};
-    use iq_types::{DevId, Predictions};
+    use iq_types::Predictions;
 
     pub struct U19Final;
 
@@ -298,7 +300,6 @@ pub(crate) mod fixture {
         const UNIT: &'static str = "U19";
         const FN: &'static str = "build_model_read_assignments";
         // U6 deviations reach U19 through the nested assignments
-        const DEVIATIONS: &'static [DevId] = &[DevId::A3, DevId::A4];
         type In = StageStoreIn;
         type Out = U19AssignmentsOut;
 
@@ -347,7 +348,9 @@ pub(crate) mod fixture {
                 final_assignments(ms, &c, |r, fa| prod.push((r, sorted(fa))));
                 let want: Vec<(u32, FinalAssign)> = serial.iter().map(|(r, a)| (*r, sorted(compact(a)))).collect();
                 if prod != want {
-                    return Err(FixError("U19: final_assignments (provisional ids) differs from the named-index run".into()));
+                    return Err(FixError(
+                        "U19: final_assignments (provisional ids) differs from the named-index run".into(),
+                    ));
                 }
             }
             let assignments = serial
@@ -362,7 +365,10 @@ pub(crate) mod fixture {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iq_types::{BlockStore, CombinedProfile, IntronGraph, IsoRec, Iv, Params, PathStorage, Predictions, ReadRecord, TranscriptModel};
+    use iq_types::{
+        BlockStore, CombinedProfile, IntronGraph, IsoRec, Iv, Params, PathStorage, Predictions, ReadRecord,
+        TranscriptModel,
+    };
     use std::sync::Mutex;
 
     /// Returns the scripted assignment for `read_key`, records which index sizes it saw.
@@ -372,7 +378,13 @@ mod tests {
     }
 
     impl ReadAssigner for Scripted {
-        fn assign(&self, index: &IsoformIndex, _p: &CombinedProfile, quick_mode: bool, read_key: u64) -> Option<Assignment> {
+        fn assign(
+            &self,
+            index: &IsoformIndex,
+            _p: &CombinedProfile,
+            quick_mode: bool,
+            read_key: u64,
+        ) -> Option<Assignment> {
             assert!(!quick_mode);
             self.calls.lock().unwrap().push((read_key, index.n_iso()));
             self.by_read.get(&read_key).cloned()
@@ -437,11 +449,25 @@ mod tests {
 
     /// Runs `for_each_final` (serial and parallel; asserts equal) with `single` and `full`
     /// scripted assigners.
-    fn run(ms: &ModelStore, recs: &[ReadRecord], bidx: &IsoformIndex, single: &Scripted, full: &Scripted) -> Vec<Assignment> {
+    fn run(
+        ms: &ModelStore,
+        recs: &[ReadRecord],
+        bidx: &IsoformIndex,
+        single: &Scripted,
+        full: &Scripted,
+    ) -> Vec<Assignment> {
         let params = Params::pacbio();
         let store = BlockStore::from_records(recs);
         let (graph, paths, preds) = (IntronGraph::default(), PathStorage::default(), Predictions::default());
-        let ctx = Ctx { params: &params, index: bidx, store: &store, graph: &graph, paths: &paths, predictions: &preds, assigner: full };
+        let ctx = Ctx {
+            params: &params,
+            index: bidx,
+            store: &store,
+            graph: &graph,
+            paths: &paths,
+            predictions: &preds,
+            assigner: full,
+        };
         let fidx = full_index(ms, &ctx);
         let reads: Vec<ReadIdx> = (0..recs.len() as ReadIdx).collect();
         let go = |thr| {
@@ -477,10 +503,10 @@ mod tests {
             record(0, Assignment::empty(AssignmentType::Inconsistent)),
             record(1, Assignment::empty(AssignmentType::Noninformative)),
             record(2, uniq(IsoRef::Ref(10), G_REF)),
-            record(3, uniq(IsoRef::Ref(11), G_REF)),          // dropped known, gene survives
+            record(3, uniq(IsoRef::Ref(11), G_REF)), // dropped known, gene survives
             record(4, uniq(IsoRef::Ref(12), GeneKey::Ref(8))), // dropped known, gene gone
             record(5, Assignment::empty(AssignmentType::Inconsistent)), // leftover → full
-            record(6, Assignment::empty(AssignmentType::Ambiguous)),    // leftover, assigner None
+            record(6, Assignment::empty(AssignmentType::Ambiguous)), // leftover, assigner None
         ];
         let kept = uniq(IsoRef::Model(0), G_NOV);
         let single = scripted([(0, kept.clone()), (1, Assignment::empty(AssignmentType::Inconsistent))]);
@@ -505,7 +531,10 @@ mod tests {
         assert_eq!(got[2], uniq(IsoRef::Model(1), G_REF));
         assert_eq!(got[3].atype, AssignmentType::Discarded);
         assert_eq!(got[3].gene_atype, AssignmentType::Unique);
-        assert_eq!((got[3].matches[0].tx, got[3].matches[0].gene, got[3].matches[0].class), (None, Some(G_REF), MatchClass::Genic));
+        assert_eq!(
+            (got[3].matches[0].tx, got[3].matches[0].gene, got[3].matches[0].class),
+            (None, Some(G_REF), MatchClass::Genic)
+        );
         assert_eq!(got[4], Assignment::empty(AssignmentType::Discarded));
         assert_eq!(got[5], amb);
         assert_eq!(got[6], Assignment::empty(AssignmentType::Noninformative));
@@ -527,7 +556,13 @@ mod tests {
         ms.next_key = 1;
         ms.construction_assignment[0] = Some(0);
         let single = scripted([(0, uniq(IsoRef::Model(3), G_NOV))]);
-        let got = run(&ms, &[record(0, Assignment::empty(AssignmentType::Noninformative))], &block_index(&[]), &single, &scripted([]));
+        let got = run(
+            &ms,
+            &[record(0, Assignment::empty(AssignmentType::Noninformative))],
+            &block_index(&[]),
+            &single,
+            &scripted([]),
+        );
         assert_eq!(got[0].atype, AssignmentType::UniqueMinorDifference);
         assert_eq!(got[0].matches[0].tx, Some(IsoRef::Model(0)));
     }
@@ -539,9 +574,13 @@ mod tests {
         ms.models.push(model(0, ModelKind::Known(10), G_REF));
         ms.next_key = 1;
         ms.construction_assignment[0] = Some(0);
-        let kept = Assignment::new(AssignmentType::UniqueMinorDifference, single_match(MatchClass::FullSpliceMatch, Some(G_REF), Some(IsoRef::Model(0))));
+        let kept = Assignment::new(
+            AssignmentType::UniqueMinorDifference,
+            single_match(MatchClass::FullSpliceMatch, Some(G_REF), Some(IsoRef::Model(0))),
+        );
         let single = scripted([(0, kept.clone())]);
-        let got = run(&ms, &[record(0, uniq(IsoRef::Ref(11), G_REF))], &block_index(&[(11, G_REF)]), &single, &scripted([]));
+        let got =
+            run(&ms, &[record(0, uniq(IsoRef::Ref(11), G_REF))], &block_index(&[(11, G_REF)]), &single, &scripted([]));
         assert_eq!(got[0], kept);
         assert_eq!(single.calls.lock().unwrap().len(), 2); // serial + parallel run
     }
@@ -549,7 +588,8 @@ mod tests {
     #[test]
     fn no_models() {
         let ms = ModelStore::new(2);
-        let recs = [record(0, Assignment::empty(AssignmentType::Inconsistent)), record(1, uniq(IsoRef::Ref(10), G_REF))];
+        let recs =
+            [record(0, Assignment::empty(AssignmentType::Inconsistent)), record(1, uniq(IsoRef::Ref(10), G_REF))];
         let got = run(&ms, &recs, &block_index(&[(10, G_REF)]), &scripted([]), &scripted([]));
         assert_eq!(got[0], Assignment::empty(AssignmentType::Noninformative));
         // gene has no surviving model

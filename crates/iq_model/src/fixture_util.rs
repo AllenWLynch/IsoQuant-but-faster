@@ -132,7 +132,20 @@ impl StageInput {
         let detected_known = extras.detected_known_isoforms.iter().map(|s| ids.txs.intern(s)).collect();
         let model_extras = store.models.iter().zip(&extras.models).map(|(m, e)| (m.key, e.clone())).collect();
         let input_genes = store.models.iter().map(|m| m.gene).collect();
-        Ok(StageInput { ids, params, block, index, index_dump, graph, paths, store, extras, detected_known, model_extras, input_genes })
+        Ok(StageInput {
+            ids,
+            params,
+            block,
+            index,
+            index_dump,
+            graph,
+            paths,
+            store,
+            extras,
+            detected_known,
+            model_extras,
+            input_genes,
+        })
     }
 
     /// Fixture-only fields of a model created in Rust: a known model takes `source` and
@@ -145,7 +158,8 @@ impl StageInput {
                 let id = self.ids.txs.resolve(t);
                 let d = &self.index_dump;
                 let source = d.sources.iter().find(|(k, _)| k == id).map(|(_, v)| v.clone()).unwrap_or_default();
-                let other_features = d.other_features.iter().find(|(k, _)| k == id).map(|(_, v)| v.clone()).unwrap_or_default();
+                let other_features =
+                    d.other_features.iter().find(|(k, _)| k == id).map(|(_, v)| v.clone()).unwrap_or_default();
                 ModelExtras { chr, source, other_features, additional_info: Vec::new() }
             }
             _ => ModelExtras { chr, source: "IsoQuant".to_owned(), ..Default::default() },
@@ -163,7 +177,8 @@ impl StageInput {
             debug_assert_eq!(got, k);
         }
         let mut ms2;
-        let ms = if ms.models.iter().any(|m| !self.input_genes.contains(&m.gene) && matches!(m.gene, GeneKey::Novel(_))) {
+        let ms = if ms.models.iter().any(|m| !self.input_genes.contains(&m.gene) && matches!(m.gene, GeneKey::Novel(_)))
+        {
             ms2 = ms.clone();
             for m in &mut ms2.models {
                 if let GeneKey::Novel(g) = m.gene {

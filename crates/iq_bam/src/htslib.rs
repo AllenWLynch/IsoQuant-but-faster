@@ -3,7 +3,7 @@
 //! htslib does the region iteration (`hts_itr_next`) and BGZF inflate (`hts_set_threads`);
 //! records are copied into the same flat [`RecordBatch`] as the noodles backend.
 //!
-//! Building hts-sys on O2 needs libclang for bindgen and the GCC builtin headers:
+//! Building hts-sys needs libclang for bindgen and, on some systems, the GCC builtin headers:
 //! `LIBCLANG_PATH=<repo>/env/lib BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-redhat-linux/11/include`.
 
 use crate::bam::{half_open, Decoder, FetchOpts, Parts, RecordBatch, RecordSource};
@@ -158,10 +158,14 @@ mod tests {
                 })
                 .collect()
         };
-        for (chr, s, e) in [("c1", 0, 2_999_999), ("c1", 100, 110), ("c1", 2000, 2000), ("c2", 0, 99_999), ("c1", 50_000, 50_000)] {
+        for (chr, s, e) in
+            [("c1", 0, 2_999_999), ("c1", 100, 110), ("c1", 2000, 2000), ("c2", 0, 99_999), ("c1", 50_000, 50_000)]
+        {
             let iv = Iv0 { s, e };
-            let a: Vec<String> = h.try_fetch(chr, iv, FetchOpts::default()).unwrap().flat_map(|b| key(&b.unwrap())).collect();
-            let b: Vec<String> = crate::try_fetch(&n, chr, iv, FetchOpts::default()).unwrap().flat_map(|b| key(&b.unwrap())).collect();
+            let a: Vec<String> =
+                h.try_fetch(chr, iv, FetchOpts::default()).unwrap().flat_map(|b| key(&b.unwrap())).collect();
+            let b: Vec<String> =
+                crate::try_fetch(&n, chr, iv, FetchOpts::default()).unwrap().flat_map(|b| key(&b.unwrap())).collect();
             assert!(!a.is_empty());
             assert_eq!(a, b, "{chr}:{s}-{e}");
         }

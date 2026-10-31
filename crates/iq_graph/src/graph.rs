@@ -99,7 +99,9 @@ pub fn build_graph_with(store: &BlockStore, index: &IsoformIndex, preds: &Predic
         let introns = &index.iso_introns[iso.intron_off as usize..(iso.intron_off + iso.n_intron) as usize];
         let exons = &index.iso_exons[iso.exon_off as usize..(iso.exon_off + iso.n_exon) as usize];
         b.starting_known.entry_default(Vertex::intron(introns[0])).push(exons[0].s as i64);
-        b.terminal_known.entry_default(Vertex::intron(introns[introns.len() - 1])).push(exons[exons.len() - 1].e as i64);
+        b.terminal_known
+            .entry_default(Vertex::intron(introns[introns.len() - 1]))
+            .push(exons[exons.len() - 1].e as i64);
     }
     // IntronCollector.process
     let all = IntronCollector::collect_introns(store);
@@ -629,11 +631,8 @@ impl Builder<'_> {
         }
 
         // Step 4: attach terminal vertices.
-        let (pv, rv, tv) = if read_end {
-            (vc::POLYA, vc::READ_END, vc::TSS_RIGHT)
-        } else {
-            (vc::POLYT, vc::READ_START, vc::TSS_LEFT)
-        };
+        let (pv, rv, tv) =
+            if read_end { (vc::POLYA, vc::READ_END, vc::TSS_RIGHT) } else { (vc::POLYT, vc::READ_START, vc::TSS_LEFT) };
         let edges = if read_end { &mut self.out } else { &mut self.inc };
         for (k, &v) in introns.iter().enumerate() {
             for (code, pc) in [(pv, &polya_pos[k]), (tv, &tss_pos[k]), (rv, &term_pos[k])] {
@@ -650,9 +649,7 @@ impl Builder<'_> {
         let iv = |v: &Vertex| Iv::new(v.0 as Pos, v.1 as Pos);
         let mut discarded: Vec<Iv> = self.ic.discarded.iter().map(iv).collect();
         discarded.sort_unstable();
-        let adj = |a: &Adj| -> IndexMap<Vertex, Vec<Vertex>> {
-            a.iter().map(|(k, s)| (*k, s.to_vec())).collect()
-        };
+        let adj = |a: &Adj| -> IndexMap<Vertex, Vec<Vertex>> { a.iter().map(|(k, s)| (*k, s.to_vec())).collect() };
         let known = |d: &PyDict<Vertex, Vec<i64>>| -> IndexMap<Iv, Vec<Pos>> {
             d.iter().map(|(k, l)| (iv(k), l.iter().map(|&x| x as Pos).collect())).collect()
         };
@@ -696,11 +693,10 @@ pub(crate) fn register_fixtures(reg: &mut iq_types::fixture::Registry) {
 
 pub(crate) mod fixture {
     use super::*;
+    use iq_types::fixture::diff::{diff_values, Diff};
     use iq_types::fixture::ids::TxSpace;
     use iq_types::fixture::schema::{GraphFixture, U11GraphIn, U11GraphOut};
     use iq_types::fixture::{FixResult, FixtureCtx, UnitFixture, Verdict};
-    use iq_types::fixture::diff::{diff_values, Diff};
-    use iq_types::DevId;
 
     pub struct U11Graph;
 
@@ -721,7 +717,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U11Graph {
         const UNIT: &'static str = "U11";
         const FN: &'static str = "IntronGraph.__init__";
-        const DEVIATIONS: &'static [DevId] = &[DevId::G1, DevId::G2];
         type In = U11GraphIn;
         type Out = U11GraphOut;
 
@@ -777,11 +772,7 @@ mod fixture_tests {
     /// U11 case; with DUMP, writes `got`/`want` JSON of mismatching cases for inspection.
     #[test]
     fn fixtures_u11() {
-        // parity check: needs the quirks41 build (the default build differs by D-G1)
         let Ok(root) = std::env::var("IQRS_FIXTURES") else { return };
-        if !iq_types::QUIRKS41 {
-            return;
-        }
         let dump = std::env::var("IQRS_U11_DUMP").ok().map(PathBuf::from);
         let mut bad = 0;
         for sample in std::fs::read_dir(&root).unwrap().flatten() {
@@ -797,8 +788,16 @@ mod fixture_tests {
                             bad += 1;
                             if let Some(d) = &dump {
                                 let n = case.case.replace(':', "_");
-                                std::fs::write(d.join(format!("{n}.got.json")), iq_types::serde_json::to_string(&got).unwrap()).unwrap();
-                                std::fs::write(d.join(format!("{n}.want.json")), iq_types::serde_json::to_string(&case.out).unwrap()).unwrap();
+                                std::fs::write(
+                                    d.join(format!("{n}.got.json")),
+                                    iq_types::serde_json::to_string(&got).unwrap(),
+                                )
+                                .unwrap();
+                                std::fs::write(
+                                    d.join(format!("{n}.want.json")),
+                                    iq_types::serde_json::to_string(&case.out).unwrap(),
+                                )
+                                .unwrap();
                             }
                         }
                     }

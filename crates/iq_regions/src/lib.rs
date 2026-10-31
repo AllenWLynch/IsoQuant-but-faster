@@ -7,7 +7,7 @@
 //! - [`split_coverage_regions`]: the 4.1 valley splitter, verbatim.
 //! - [`owner_block`]: max-overlap owner block (cost-estimate partition; U8 processes a read in every block whose fetch returns it, as 4.1).
 //! - [`GeneOracle`]: the gene overlap query; `iq_annot::AnnotationIndex` implements it via a
-//!   per-chromosome adapter (`genes_for_region0`, the D-R1 site).
+//!   per-chromosome adapter (`genes_for_region0`, 0-based query as in 4.1).
 //!
 //! Fixture runners: unit `U3`, fns `split_coverage_regions`, `process_alignments_in_region`,
 //! `cluster`, `genes_in_region` ([`register_fixtures`]).

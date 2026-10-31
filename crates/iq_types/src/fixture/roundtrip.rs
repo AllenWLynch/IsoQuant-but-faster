@@ -193,7 +193,10 @@ pub fn fixture_files(root: &std::path::Path) -> Vec<std::path::PathBuf> {
                 if n != "outputs" && n != "slice" {
                     walk(&p, out);
                 }
-            } else if n.ends_with(".jsonl.gz") || n == "params.json" || (n.ends_with(".json") && p.parent().is_some_and(|q| q.ends_with("index"))) {
+            } else if n.ends_with(".jsonl.gz")
+                || n == "params.json"
+                || (n.ends_with(".json") && p.parent().is_some_and(|q| q.ends_with("index")))
+            {
                 out.push(p);
             }
         }

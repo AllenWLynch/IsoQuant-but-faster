@@ -244,7 +244,12 @@ pub fn read_order_moments(data: &[Pos], sq: &mut Vec<f64>) -> (f64, f64) {
 /// read of the block (block order) to the ungrouped polyA and, when `params.use_tss_model`
 /// (`--fl_data`), TSS counters and flushes them. `_index` is unused: the annotated position it
 /// would give only sets the side-output `flag` column.
-pub fn block_predictions(store: &BlockStore, _index: &IsoformIndex, models: &XgbModels, params: &Params) -> Predictions {
+pub fn block_predictions(
+    store: &BlockStore,
+    _index: &IsoformIndex,
+    models: &XgbModels,
+    params: &Params,
+) -> Predictions {
     let mut polya = TerminalAccumulator::new();
     let mut tss = TerminalAccumulator::new();
     let mut out = Predictions::default();
@@ -283,7 +288,6 @@ pub mod fixture {
     use crate::xgb::bundled_models;
     use iq_types::fixture::schema::{PredictionsOut, U10bFlushIn};
     use iq_types::fixture::{Diff, DiffEntry, FixResult, FixtureCtx, UnitFixture, Verdict};
-    use iq_types::DevId;
     use std::cell::RefCell;
 
     /// What the last `run` on this thread accumulated: `(kind, [(tx, data)])`. `compare` is
@@ -298,7 +302,6 @@ pub mod fixture {
     impl UnitFixture for U10bFlush {
         const UNIT: &'static str = "U10b";
         const FN: &'static str = "flush";
-        const DEVIATIONS: &'static [DevId] = &[DevId::T1];
         type In = U10bFlushIn;
         type Out = PredictionsOut;
 
@@ -370,7 +373,7 @@ pub mod fixture {
                 None => Err("no accumulation recorded for the D-T1 check".to_owned()),
             };
             match res {
-                Ok(()) => Verdict::Explained(DevId::T1),
+                Ok(()) => Verdict::Explained("D-T1"),
                 Err(msg) => Verdict::Mismatch(Diff {
                     entries: vec![
                         DiffEntry {
@@ -549,9 +552,7 @@ mod tests {
         let n_sites = 1 + rng.below(4);
         let n = 1 + rng.below(300) as usize;
         let sites: Vec<Pos> = (0..n_sites).map(|_| base + rng.below(200) as Pos).collect();
-        (0..n)
-            .map(|_| sites[rng.below(n_sites) as usize] + rng.below(7) as Pos - 3)
-            .collect()
+        (0..n).map(|_| sites[rng.below(n_sites) as usize] + rng.below(7) as Pos - 3).collect()
     }
 
     #[test]

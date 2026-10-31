@@ -271,8 +271,13 @@ fn child_budget_rss() {
 fn b_budget_rss() {
     let out = child("tests::child_budget_rss");
     eprintln!("{out}");
-    let (stores, budget, peak, base, acc) =
-        (field(&out, "STORES"), field(&out, "BUDGET"), field(&out, "PEAK_RSS"), field(&out, "BASELINE"), field(&out, "PEAK_ACC"));
+    let (stores, budget, peak, base, acc) = (
+        field(&out, "STORES"),
+        field(&out, "BUDGET"),
+        field(&out, "PEAK_RSS"),
+        field(&out, "BASELINE"),
+        field(&out, "PEAK_ACC"),
+    );
     assert!(stores > budget, "scenario must need spill");
     assert_eq!(field(&out, "OVER"), 0.0);
     assert!(acc <= budget);

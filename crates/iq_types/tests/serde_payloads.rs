@@ -10,7 +10,8 @@ use iq_types::*;
 const A: &str = r#"{"atype":10,"gene_atype":1,"matches":[{"gene":"gene:G1","tx":"transcript:T1","strand":"+","class":10,"penalty":0.0,"events":[{"t":11,"iso":[2147483648,2147483648],"read":[0,1],"info":0}]},{"gene":null,"tx":null,"strand":".","class":0,"penalty":1.2000000000000002,"events":[{"t":1003,"iso":[1073741823,1073741825],"read":[-1,2147483647],"info":-35}]}]}"#;
 const M: &str = r#"{"id":"transcript3.8.nic","gene":"novel_gene_8_1","chr":"8","strand":"+","type":2,"exons":[[100,200],[300,400]],"intron_path":[[-21,100],[201,299],[-10,400]],"polya_confirmed":true,"tss_confirmed":false,"source":"IsoQuant","other_features":[[150,200,"CDS"]],"additional_info":[["k","v"]]}"#;
 const P: &str = r#"{"delta":4,"minor_exon_extension":50,"major_exon_extension":300,"min_abs_exon_overlap":10,"min_rel_exon_overlap":0.2,"minimal_exon_overlap":5,"minimal_intron_absence_overlap":20,"micro_intron_length":50,"max_fake_terminal_exon_len":20,"max_intron_shift":30,"max_missed_exon_len":50,"max_intron_abs_diff":30,"max_intron_rel_diff":0.2,"max_suspicious_intron_abs_len":0,"max_suspicious_intron_rel_len":0.0,"resolve_ambiguous":20,"apa_delta":50,"count_exons":false,"correct_fuzzy_junctions":true,"correct_intron_shifts":false,"correct_skipped_exons":true,"correct_fake_terminal_exons":false,"correct_terminal_exons":false,"correct_microintron_retention":true}"#;
-const PROF: &str = r#"{"gene_profile":[1,-1,-2,0],"read_profile":[1],"read_features":[[201,299]],"gene_profile_range":[0,2]}"#;
+const PROF: &str =
+    r#"{"gene_profile":[1,-1,-2,0],"read_profile":[1],"read_features":[[201,299]],"gene_profile_range":[0,2]}"#;
 const ALN: &str = r#"{"qname":"r0","flag":16,"pos0":99,"ref_end0":400,"mapq":60,"is_reverse":true,"cigar":[[4,5],[0,101],[3,99],[0,101]],"seq":"ACGTN"}"#;
 const B: &str = r#"{"sample":"S","slice":"sl","chr":"8","block_no":3}"#;
 const G: &str = r#"{"clustered_introns":[[[201,299],5]],"intron_correction_map":[[[202,299],[201,299]]],"discarded_introns":[[500,600]],"outgoing":[[[201,299],[[-10,400]]],[[-21,100],[[201,299]]]],"incoming":[[[201,299],[[-21,100]]]],"starting_known_positions":[[[201,299],[100,101]]],"terminal_known_positions":[[[201,299],[400]]],"max_coverage":5}"#;
@@ -58,59 +59,178 @@ fn every_payload_roundtrips() {
         n += 1;
     };
 
-    c("U1", "dump_annotation", r#""db":"x.db","gff3":"a.gff3","chr":"8","gene_types":"isoquant""#,
-      r#"{"chr":"8","genes":[{"id":"gene:G1","start":1,"end":900,"strand":"-","source":"ensembl","attributes":[["ID",["gene:G1"]],["Name",["a","b"]]],"attrs":"Name \"a\"; ","transcripts":[{"id":"transcript:T1","type":"mRNA","start":1,"end":900,"strand":"-","source":"ensembl","attributes":[],"attrs":"","exons":[[1,10],[20,900]],"other_features":[[5,10,"CDS"]],"children_order_index":0}]}]}"#);
-    c("U1", "get_gene_info_for_region", r#""chr":"8","region":[99,1000],"delta":4,"needs_reference":true"#,
-      r#"{"gene_ids":["gene:G1"],"index":"0123abcd","empty":false}"#);
-    c("U1", "from_models", &format!(r#""models":[{M}],"delta":5,"call_site":"assign_reads_to_models""#), r#"{"index":"0123abcd"}"#);
-    c("U2", "fetch", r#""bam":"s.bam","region":"8:1001-2000","n":3"#,
-      r#"{"qname":"r0","flag":0,"ref_id":0,"ref_name":"8","pos0":1000,"ref_end0":1100,"mapq":60,"cigar":[[0,100]],"seq":"ACGT","qual_len":4,"tags":{"HP":{"type":"Z","value":"A"},"XI":{"type":"i","value":2}}}"#);
-    c("U3", "split_coverage_regions", r#""chr":"8","region":[99,5000],"read_count":10,"coverage":[[0,3],[1,0],[19,7]]"#,
-      r#"{"splits":[[[99,512],3],[[4865,5000],7]]}"#);
-    c("U3", "process_alignments_in_region", r#""chr":"8","region":[99,5000],"max_coverage":7,"chr_len":59000000,"small_chr":false,"coverage_cutoff":-1"#,
-      r#"{"block_no":3,"skip_read_fraction":1,"gene_ids":["gene:G1"],"index":"0123abcd","genic":true}"#);
+    c(
+        "U1",
+        "dump_annotation",
+        r#""db":"x.db","gff3":"a.gff3","chr":"8","gene_types":"isoquant""#,
+        r#"{"chr":"8","genes":[{"id":"gene:G1","start":1,"end":900,"strand":"-","source":"ensembl","attributes":[["ID",["gene:G1"]],["Name",["a","b"]]],"attrs":"Name \"a\"; ","transcripts":[{"id":"transcript:T1","type":"mRNA","start":1,"end":900,"strand":"-","source":"ensembl","attributes":[],"attrs":"","exons":[[1,10],[20,900]],"other_features":[[5,10,"CDS"]],"children_order_index":0}]}]}"#,
+    );
+    c(
+        "U1",
+        "get_gene_info_for_region",
+        r#""chr":"8","region":[99,1000],"delta":4,"needs_reference":true"#,
+        r#"{"gene_ids":["gene:G1"],"index":"0123abcd","empty":false}"#,
+    );
+    c(
+        "U1",
+        "from_models",
+        &format!(r#""models":[{M}],"delta":5,"call_site":"assign_reads_to_models""#),
+        r#"{"index":"0123abcd"}"#,
+    );
+    c(
+        "U2",
+        "fetch",
+        r#""bam":"s.bam","region":"8:1001-2000","n":3"#,
+        r#"{"qname":"r0","flag":0,"ref_id":0,"ref_name":"8","pos0":1000,"ref_end0":1100,"mapq":60,"cigar":[[0,100]],"seq":"ACGT","qual_len":4,"tags":{"HP":{"type":"Z","value":"A"},"XI":{"type":"i","value":2}}}"#,
+    );
+    c(
+        "U3",
+        "split_coverage_regions",
+        r#""chr":"8","region":[99,5000],"read_count":10,"coverage":[[0,3],[1,0],[19,7]]"#,
+        r#"{"splits":[[[99,512],3],[[4865,5000],7]]}"#,
+    );
+    c(
+        "U3",
+        "process_alignments_in_region",
+        r#""chr":"8","region":[99,5000],"max_coverage":7,"chr_len":59000000,"small_chr":false,"coverage_cutoff":-1"#,
+        r#"{"block_no":3,"skip_read_fraction":1,"gene_ids":["gene:G1"],"index":"0123abcd","genic":true}"#,
+    );
     c("U3", "cluster", r#""chr":"8","region":[99,5000],"read_count":10"#, r#"{"n_blocks":2,"first_block_no":3}"#);
     c("U3", "genes_in_region", r#""chr":"8","region":[99,5000]"#, r#"{"gene_ids":[]}"#);
-    c("U4", "process_alignment",
-      &format!(r#""read":{{"qname":"r0","aln_no":4}},"aln":{ALN},"polya_window":16,"polya_fraction":0.75,"max_fake_terminal_exon_len":20,"external_strand":null,"external_no_tail":false"#),
-      r#"{"init":{"read_exons":[[100,200],[300,400]],"read_blocks":[[5,105],[106,206]],"cigar_blocks":[[1,1],[3,3]]},"polya":[-1,-1,-1,-1],"read_exons":[[100,200],[300,400]],"read_blocks":[[5,105],[106,206]],"cigar_blocks":[[1,1],[3,3]],"exons_changed":false,"polya_called":true}"#);
-    c("U4", "process_alignment",
-      &format!(r#""read":{{"qname":"r0","aln_no":4}},"aln":{ALN},"polya_window":16,"polya_fraction":0.75,"max_fake_terminal_exon_len":20,"external_strand":"+","external_no_tail":false"#),
-      r#"{"init":{"read_exons":[],"read_blocks":[],"cigar_blocks":[]},"polya":null,"read_exons":[],"read_blocks":[],"cigar_blocks":[],"exons_changed":false,"polya_called":false}"#);
-    c("U4", "extract_relevant_deletions", r#""read":{"qname":"r0","aln_no":4},"cigar":[[0,10],[2,3],[0,10]],"ref_start":100,"exons":[[101,123]],"margin":10"#,
-      r#"{"deletions":[[111,3]]}"#);
-    c("U5", "construct_profiles", &format!(r#""call_site":"collect","read":{{"qname":"r0","aln_no":4}},"index":"0123abcd","params":{P},"blocks":[[100,200],[300,400]],"polya":[400,-1,-1,-1]"#),
-      &format!(r#"{{"intron":{PROF},"exon":null,"split_exon":{PROF}}}"#));
-    c("U5", "construct_profiles", &format!(r#""call_site":"similar","read":null,"index":"0123abcd","params":{P},"blocks":[[100,200]],"polya":[-1,-1,-1,-1]"#),
-      &format!(r#"{{"intron":{PROF},"exon":null,"split_exon":{PROF}}}"#));
-    c("U5", "match_genomic_features", r#""call_site":"exon_corrector","read":{"read_idx":3},"known_features":[[1,5]],"delta":4,"read_features":[[2,5]]"#,
-      r#"{"features":[[1,5]]}"#);
-    c("U6", "assign_to_isoform", &format!(r#""call_site":"fl","read":{{"id":"transcript3.8.nic"}},"read_id":"transcript3.8.nic","index":"0123abcd","params":{P},"quick_mode":false,"profile":{cp}"#),
-      &format!(r#"{{"assignment":{A}}}"#));
-    c("U6", "assign_to_isoform", &format!(r#""call_site":"reassign","read":{{"read_idx":7}},"read_id":"r7","index":"0123abcd","params":{P},"quick_mode":true,"profile":{cp}"#),
-      r#"{"assignment":null}"#);
-    c("U7", "correct_assigned_read",
-      &format!(r#""read":{{"qname":"r0","aln_no":4}},"index":"0123abcd","params":{P},"aln":{ALN},"read_exons":[[100,200]],"read_start":100,"read_end":200,"intron_profile":{PROF},"assignment":{A},"ref":[{{"start0":99,"seq":"ACGTacgt"}}]"#),
-      r#"{"corrected_exons":[[100,200]]}"#);
-    c("U7", "get_assignment_strand", &format!(r#""read":{{"qname":"r0","aln_no":4}},"assignment":{A},"polya":[-1,-1,-1,-1],"exons":[[1,5],[10,20]],"corrected_introns":[[6,9]],"intron_sites":[[[6,9],"GT","AG"]]"#),
-      r#"{"strand":"-"}"#);
-    c("U7", "check_antisense", &format!(r#""read":{{"qname":"r0","aln_no":4}},"strand":"+","assignment":{A}"#), &format!(r#"{{"assignment":{A}}}"#));
-    c("U8", "collect_block", r#""chr":"8","block_no":3,"region":[99,5000],"index":"0123abcd","genic":true,"skip_read_fraction":1,"max_coverage":7"#,
-      &format!(r#"{{"reads":[{rr}]}}"#));
-    c("U9", "resolve", r#""strategy":2,"assignments":[{"assignment_id":1,"read_id":"r0","chr":"8","start":100,"end":400,"region":[99,5000],"multimapper":true,"polya_found":false,"atype":10,"gene_atype":10,"penalty":0.0,"genes":["gene:G1"],"isoforms":["transcript:T1","transcript:T2"]}]"#,
-      r#"{"assignments":[]}"#);
-    c("U10a", "detect_peaks_batch", r#""model":"polya","histograms":[[[400,3],[402,1]],null]"#,
-      r#"{"records":[{"start":400,"mode":400,"var":0.75,"skew":"NaN","entropy":0.5623351446188083,"mean_height":0.17391304347826086,"peak_count":1,"histogram":[0,3,0,1,0],"raw_peaks":{"peak_location":[10],"peak_width":[2.04],"peak_left":[0],"peak_right":[1],"peak_heights":[3]}},null],"rows":[{"hist":0,"features":[0.75,"NaN",1.0,2.04,0.56,0.17,3.0,1.0],"proba":0.9123,"margin":2.3456,"label":1}],"peaks":[[[400,3,399,401]],[]]}"#);
-    c("U10a", "xgb_predict", r#""model":"tss","caller":"_predict_rows","features":[[1.0,"Infinity",-1e-05,1e+16,0.0,0.0,0.0,0.0]]"#,
-      r#"{"labels":[0],"proba":[0.1],"margin":[-2.1972246]}"#);
-    c("U10b", "flush", &format!(r#""kind":"polya","block":{B},"transcripts":[["transcript:T1",{{"chr":"8","gene_id":"gene:G1","data":[400,400,402],"annotated":400}}]]"#),
-      r#"{"predictions":[["transcript:T1",400]]}"#);
-    c("U11", "IntronGraph.__init__", &format!(r#""block":{B},"index":"0123abcd","polya_predictions":[["transcript:T1",400]],"tss_predictions":null"#),
-      &format!(r#"{{"graph":{G}}}"#));
-    c("U12", "IntronPathStorage.fill", &format!(r#""block":{B},"graph":"S:sl:8:3:n0""#),
-      r#"{"paths":[[[[-21,100],[201,299],[-10,400]],4]],"fl_paths":[[[-21,100],[201,299],[-10,400]]],"paths_to_reads":[[[[-21,100],[201,299],[-10,400]],[0,1,2,3]]]}"#);
-    c("U12", "get_known_spliced_isoforms", &format!(r#""block":{B},"graph":"S:sl:8:3:n0","index":"0123abcd""#),
-      r#"{"known":[[[[201,299]],"transcript:T1"]]}"#);
+    c(
+        "U4",
+        "process_alignment",
+        &format!(
+            r#""read":{{"qname":"r0","aln_no":4}},"aln":{ALN},"polya_window":16,"polya_fraction":0.75,"max_fake_terminal_exon_len":20,"external_strand":null,"external_no_tail":false"#
+        ),
+        r#"{"init":{"read_exons":[[100,200],[300,400]],"read_blocks":[[5,105],[106,206]],"cigar_blocks":[[1,1],[3,3]]},"polya":[-1,-1,-1,-1],"read_exons":[[100,200],[300,400]],"read_blocks":[[5,105],[106,206]],"cigar_blocks":[[1,1],[3,3]],"exons_changed":false,"polya_called":true}"#,
+    );
+    c(
+        "U4",
+        "process_alignment",
+        &format!(
+            r#""read":{{"qname":"r0","aln_no":4}},"aln":{ALN},"polya_window":16,"polya_fraction":0.75,"max_fake_terminal_exon_len":20,"external_strand":"+","external_no_tail":false"#
+        ),
+        r#"{"init":{"read_exons":[],"read_blocks":[],"cigar_blocks":[]},"polya":null,"read_exons":[],"read_blocks":[],"cigar_blocks":[],"exons_changed":false,"polya_called":false}"#,
+    );
+    c(
+        "U4",
+        "extract_relevant_deletions",
+        r#""read":{"qname":"r0","aln_no":4},"cigar":[[0,10],[2,3],[0,10]],"ref_start":100,"exons":[[101,123]],"margin":10"#,
+        r#"{"deletions":[[111,3]]}"#,
+    );
+    c(
+        "U5",
+        "construct_profiles",
+        &format!(
+            r#""call_site":"collect","read":{{"qname":"r0","aln_no":4}},"index":"0123abcd","params":{P},"blocks":[[100,200],[300,400]],"polya":[400,-1,-1,-1]"#
+        ),
+        &format!(r#"{{"intron":{PROF},"exon":null,"split_exon":{PROF}}}"#),
+    );
+    c(
+        "U5",
+        "construct_profiles",
+        &format!(
+            r#""call_site":"similar","read":null,"index":"0123abcd","params":{P},"blocks":[[100,200]],"polya":[-1,-1,-1,-1]"#
+        ),
+        &format!(r#"{{"intron":{PROF},"exon":null,"split_exon":{PROF}}}"#),
+    );
+    c(
+        "U5",
+        "match_genomic_features",
+        r#""call_site":"exon_corrector","read":{"read_idx":3},"known_features":[[1,5]],"delta":4,"read_features":[[2,5]]"#,
+        r#"{"features":[[1,5]]}"#,
+    );
+    c(
+        "U6",
+        "assign_to_isoform",
+        &format!(
+            r#""call_site":"fl","read":{{"id":"transcript3.8.nic"}},"read_id":"transcript3.8.nic","index":"0123abcd","params":{P},"quick_mode":false,"profile":{cp}"#
+        ),
+        &format!(r#"{{"assignment":{A}}}"#),
+    );
+    c(
+        "U6",
+        "assign_to_isoform",
+        &format!(
+            r#""call_site":"reassign","read":{{"read_idx":7}},"read_id":"r7","index":"0123abcd","params":{P},"quick_mode":true,"profile":{cp}"#
+        ),
+        r#"{"assignment":null}"#,
+    );
+    c(
+        "U7",
+        "correct_assigned_read",
+        &format!(
+            r#""read":{{"qname":"r0","aln_no":4}},"index":"0123abcd","params":{P},"aln":{ALN},"read_exons":[[100,200]],"read_start":100,"read_end":200,"intron_profile":{PROF},"assignment":{A},"ref":[{{"start0":99,"seq":"ACGTacgt"}}]"#
+        ),
+        r#"{"corrected_exons":[[100,200]]}"#,
+    );
+    c(
+        "U7",
+        "get_assignment_strand",
+        &format!(
+            r#""read":{{"qname":"r0","aln_no":4}},"assignment":{A},"polya":[-1,-1,-1,-1],"exons":[[1,5],[10,20]],"corrected_introns":[[6,9]],"intron_sites":[[[6,9],"GT","AG"]]"#
+        ),
+        r#"{"strand":"-"}"#,
+    );
+    c(
+        "U7",
+        "check_antisense",
+        &format!(r#""read":{{"qname":"r0","aln_no":4}},"strand":"+","assignment":{A}"#),
+        &format!(r#"{{"assignment":{A}}}"#),
+    );
+    c(
+        "U8",
+        "collect_block",
+        r#""chr":"8","block_no":3,"region":[99,5000],"index":"0123abcd","genic":true,"skip_read_fraction":1,"max_coverage":7"#,
+        &format!(r#"{{"reads":[{rr}]}}"#),
+    );
+    c(
+        "U9",
+        "resolve",
+        r#""strategy":2,"assignments":[{"assignment_id":1,"read_id":"r0","chr":"8","start":100,"end":400,"region":[99,5000],"multimapper":true,"polya_found":false,"atype":10,"gene_atype":10,"penalty":0.0,"genes":["gene:G1"],"isoforms":["transcript:T1","transcript:T2"]}]"#,
+        r#"{"assignments":[]}"#,
+    );
+    c(
+        "U10a",
+        "detect_peaks_batch",
+        r#""model":"polya","histograms":[[[400,3],[402,1]],null]"#,
+        r#"{"records":[{"start":400,"mode":400,"var":0.75,"skew":"NaN","entropy":0.5623351446188083,"mean_height":0.17391304347826086,"peak_count":1,"histogram":[0,3,0,1,0],"raw_peaks":{"peak_location":[10],"peak_width":[2.04],"peak_left":[0],"peak_right":[1],"peak_heights":[3]}},null],"rows":[{"hist":0,"features":[0.75,"NaN",1.0,2.04,0.56,0.17,3.0,1.0],"proba":0.9123,"margin":2.3456,"label":1}],"peaks":[[[400,3,399,401]],[]]}"#,
+    );
+    c(
+        "U10a",
+        "xgb_predict",
+        r#""model":"tss","caller":"_predict_rows","features":[[1.0,"Infinity",-1e-05,1e+16,0.0,0.0,0.0,0.0]]"#,
+        r#"{"labels":[0],"proba":[0.1],"margin":[-2.1972246]}"#,
+    );
+    c(
+        "U10b",
+        "flush",
+        &format!(
+            r#""kind":"polya","block":{B},"transcripts":[["transcript:T1",{{"chr":"8","gene_id":"gene:G1","data":[400,400,402],"annotated":400}}]]"#
+        ),
+        r#"{"predictions":[["transcript:T1",400]]}"#,
+    );
+    c(
+        "U11",
+        "IntronGraph.__init__",
+        &format!(
+            r#""block":{B},"index":"0123abcd","polya_predictions":[["transcript:T1",400]],"tss_predictions":null"#
+        ),
+        &format!(r#"{{"graph":{G}}}"#),
+    );
+    c(
+        "U12",
+        "IntronPathStorage.fill",
+        &format!(r#""block":{B},"graph":"S:sl:8:3:n0""#),
+        r#"{"paths":[[[[-21,100],[201,299],[-10,400]],4]],"fl_paths":[[[-21,100],[201,299],[-10,400]]],"paths_to_reads":[[[[-21,100],[201,299],[-10,400]],[0,1,2,3]]]}"#,
+    );
+    c(
+        "U12",
+        "get_known_spliced_isoforms",
+        &format!(r#""block":{B},"graph":"S:sl:8:3:n0","index":"0123abcd""#),
+        r#"{"known":[[[[201,299]],"transcript:T1"]]}"#,
+    );
     let store_in = format!(r#"{pre_full},"store":{s}"#);
     let store_reads_in = format!(r#"{pre_full},"store":{s},"reads":[0,1,2]"#);
     let store_out = format!(r#"{{"store":{s}}}"#);
@@ -127,28 +247,89 @@ fn every_payload_roundtrips() {
     ] {
         c(u, f, i, &store_out);
     }
-    c("U15a", "detect_similar_isoforms", &format!(r#"{pre_null},"models":[{M}],"remove_unconfirmed":true"#),
-      r#"{"to_substitute":[["transcript3.8.nic","transcript:T1"]]}"#);
-    c("U15b", "correct_novel_transcript_ends", &format!(r#"{pre_full},"model":{M},"reads":[0,2]"#), &format!(r#"{{"model":{M}}}"#));
-    c("U15b", "_mark_terminal_confirmation", &format!(r#"{pre_full},"model":{M},"reads":[0,2]"#), &format!(r#"{{"model":{M}}}"#));
-    c("U15b", "derive_alternative_end_models", &format!(r#"{pre_full},"model":{M},"reads":[0,2],"id_counter":7"#),
-      &format!(r#"{{"result":[[{M},[0]]],"id_counter":8}}"#));
-    c("U16", "_correct_one_model_splice_sites",
-      &format!(r#"{pre_null},"model":{M},"reads":[{{"idx":0,"start":100,"end":400,"boundary_deletions":[[199,4]]}}],"ref":[{{"start0":135,"seq":"ACGT"}}]"#),
-      r#"{"exons":null}"#);
-    c("U18", "join_transcripts", &format!(r#""block":{B},"index":"0123abcd","models":[{M}]"#), &format!(r#"{{"models":[{M}]}}"#));
-    c("U19", "build_model_read_assignments", &store_reads_in, &format!(r#"{{"assignments":[{{"read_idx":0,"assignment":{A}}}]}}"#));
-    c("U20", "gff_dump", &format!(r#""block":{B},"printer":"transcript_models","index":"0123abcd","models":[{M}],"printed_gene_ids":[],"exon_id_counter":0"#),
-      r#"{"lines":["8\tIsoQuant\tgene\t100\t400\t.\t+\t.\tgene_id \"novel_gene_8_1\"; transcripts \"1\"; \n"],"exon_id_counter":2}"#);
-    c("U20", "counter_add_read_info", &format!(r#""counter":{{"name":"OUT.discovered_transcript_counts","grouped":false,"group_index":-1}},"read":{{"read_idx":3}},"assignment":{A},"read_group":["A"]"#),
-      r#"{"features":[["transcript:T1",[["NA",0.0,1.0]]]],"ambiguous":[0,1],"not_assigned":[5,5],"confirmed_added":[]}"#);
-    c("U20", "counter_add_read_info", &format!(r#""counter":{{"name":"x","grouped":true,"group_index":0}},"read":null,"assignment":{A},"read_group":[]"#),
-      r#"{"features":[],"ambiguous":[0,0],"not_assigned":[0,0],"confirmed_added":["transcript:T1"]}"#);
-    c("U20", "counter_dump", r#""counter":{"name":"x","grouped":false,"group_index":-1},"feature_counter":[["transcript:T1",[["NA",2.0]]]],"all_features":["transcript:T1"],"confirmed_features":[],"ambiguous":1,"not_assigned":2,"not_aligned":0"#,
-      r#"{"files":[["x.tsv","feature_id\tcount\ntranscript:T1\t2.00\n"]]}"#);
+    c(
+        "U15a",
+        "detect_similar_isoforms",
+        &format!(r#"{pre_null},"models":[{M}],"remove_unconfirmed":true"#),
+        r#"{"to_substitute":[["transcript3.8.nic","transcript:T1"]]}"#,
+    );
+    c(
+        "U15b",
+        "correct_novel_transcript_ends",
+        &format!(r#"{pre_full},"model":{M},"reads":[0,2]"#),
+        &format!(r#"{{"model":{M}}}"#),
+    );
+    c(
+        "U15b",
+        "_mark_terminal_confirmation",
+        &format!(r#"{pre_full},"model":{M},"reads":[0,2]"#),
+        &format!(r#"{{"model":{M}}}"#),
+    );
+    c(
+        "U15b",
+        "derive_alternative_end_models",
+        &format!(r#"{pre_full},"model":{M},"reads":[0,2],"id_counter":7"#),
+        &format!(r#"{{"result":[[{M},[0]]],"id_counter":8}}"#),
+    );
+    c(
+        "U16",
+        "_correct_one_model_splice_sites",
+        &format!(
+            r#"{pre_null},"model":{M},"reads":[{{"idx":0,"start":100,"end":400,"boundary_deletions":[[199,4]]}}],"ref":[{{"start0":135,"seq":"ACGT"}}]"#
+        ),
+        r#"{"exons":null}"#,
+    );
+    c(
+        "U18",
+        "join_transcripts",
+        &format!(r#""block":{B},"index":"0123abcd","models":[{M}]"#),
+        &format!(r#"{{"models":[{M}]}}"#),
+    );
+    c(
+        "U19",
+        "build_model_read_assignments",
+        &store_reads_in,
+        &format!(r#"{{"assignments":[{{"read_idx":0,"assignment":{A}}}]}}"#),
+    );
+    c(
+        "U20",
+        "gff_dump",
+        &format!(
+            r#""block":{B},"printer":"transcript_models","index":"0123abcd","models":[{M}],"printed_gene_ids":[],"exon_id_counter":0"#
+        ),
+        r#"{"lines":["8\tIsoQuant\tgene\t100\t400\t.\t+\t.\tgene_id \"novel_gene_8_1\"; transcripts \"1\"; \n"],"exon_id_counter":2}"#,
+    );
+    c(
+        "U20",
+        "counter_add_read_info",
+        &format!(
+            r#""counter":{{"name":"OUT.discovered_transcript_counts","grouped":false,"group_index":-1}},"read":{{"read_idx":3}},"assignment":{A},"read_group":["A"]"#
+        ),
+        r#"{"features":[["transcript:T1",[["NA",0.0,1.0]]]],"ambiguous":[0,1],"not_assigned":[5,5],"confirmed_added":[]}"#,
+    );
+    c(
+        "U20",
+        "counter_add_read_info",
+        &format!(
+            r#""counter":{{"name":"x","grouped":true,"group_index":0}},"read":null,"assignment":{A},"read_group":[]"#
+        ),
+        r#"{"features":[],"ambiguous":[0,0],"not_assigned":[0,0],"confirmed_added":["transcript:T1"]}"#,
+    );
+    c(
+        "U20",
+        "counter_dump",
+        r#""counter":{"name":"x","grouped":false,"group_index":-1},"feature_counter":[["transcript:T1",[["NA",2.0]]]],"all_features":["transcript:T1"],"confirmed_features":[],"ambiguous":1,"not_assigned":2,"not_aligned":0"#,
+        r#"{"files":[["x.tsv","feature_id\tcount\ntranscript:T1\t2.00\n"]]}"#,
+    );
     // exception out
-    c("U6", "assign_to_isoform", &format!(r#""call_site":"collect","read":{{"read_idx":7}},"read_id":"r7","index":"0123abcd","params":{P},"quick_mode":false,"profile":{cp}"#),
-      r#"{"exception":"KeyError: 'x'"}"#);
+    c(
+        "U6",
+        "assign_to_isoform",
+        &format!(
+            r#""call_site":"collect","read":{{"read_idx":7}},"read_id":"r7","index":"0123abcd","params":{P},"quick_mode":false,"profile":{cp}"#
+        ),
+        r#"{"exception":"KeyError: 'x'"}"#,
+    );
 
     // every (unit, fn) of the payload table has been exercised
     assert!(n >= PAYLOAD_TABLE.len(), "{n} cases for {} payload entries", PAYLOAD_TABLE.len());

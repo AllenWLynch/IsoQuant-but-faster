@@ -3,14 +3,16 @@
 //!
 //! Python line numbers (`:N`) refer to `long_read_assigner.py`.
 
-use crate::assigner::{classify_assignment, inconsistency_classification, mono_exon_classification, Assigner, NucScore};
+use crate::assigner::{
+    classify_assignment, inconsistency_classification, mono_exon_classification, Assigner, NucScore,
+};
 use crate::junction::JunctionComparator;
 use iq_types::enums::match_consts::{ABSENT_POSITION, UNDEFINED_REGION};
 use iq_types::params::TOP_SCORED_FACTOR;
 use iq_types::smallvec::SmallVec;
 use iq_types::{
-    elongation_cost, Assignment, AssignmentType, CombinedProfile, EventType, Events, IsoformMatch, MatchClass, MatchEvent,
-    Matches, Strand,
+    elongation_cost, Assignment, AssignmentType, CombinedProfile, EventType, Events, IsoformMatch, MatchClass,
+    MatchEvent, Matches, Strand,
 };
 
 /// `read_matches` of `detect_inconsistensies`: `(isoform, events)` in insertion order
@@ -71,7 +73,8 @@ impl<'a> Assigner<'a> {
         let mut candidates = std::mem::take(&mut self.scratch.inc2);
         candidates.clear();
         self.select_similar_isoforms(p, &mut candidates);
-        let read_matches = if candidates.is_empty() { ReadMatches::new() } else { self.detect_inconsistencies(p, &mut candidates) };
+        let read_matches =
+            if candidates.is_empty() { ReadMatches::new() } else { self.detect_inconsistencies(p, &mut candidates) };
         self.scratch.inc2 = candidates;
         if read_matches.is_empty() {
             return self.assign_to_overlapping_genes(read_region, MatchClass::Genic);
@@ -83,7 +86,8 @@ impl<'a> Assigner<'a> {
             self.assign_to_overlapping_genes(read_region, MatchClass::Genic)
         } else {
             self.sort_by_id(&mut best);
-            let events_of = |iso: u32| -> &Events { &read_matches.iter().find(|x| x.0 == iso).expect("selected isoform").1 };
+            let events_of =
+                |iso: u32| -> &Events { &read_matches.iter().find(|x| x.0 == iso).expect("selected isoform").1 };
             let atype = classify_assignment(best.len() > 1, best.iter().flat_map(|&i| events_of(i).iter()));
             let matches: Matches = if p.intron.read_profile.is_empty() {
                 // create_monoexon_matches (:678-689)
@@ -143,7 +147,12 @@ impl<'a> Assigner<'a> {
             let mut cands: SmallVec<[(u32, u32, f64); 16]> = significant
                 .iter()
                 .map(|&iso| {
-                    let diff = difference_in_present_features(self.index.intron_prof.row(iso as usize), &ip.gene_profile, lo, hi);
+                    let diff = difference_in_present_features(
+                        self.index.intron_prof.row(iso as usize),
+                        &ip.gene_profile,
+                        lo,
+                        hi,
+                    );
                     (iso, diff, 0.0)
                 })
                 .collect();
@@ -185,7 +194,12 @@ impl<'a> Assigner<'a> {
     /// order (f64, same summation order as 4.1); keeps the isoforms with the minimal penalty
     /// (exact `==`), resolving ties by coverage score. Writes them to `best` (cleared
     /// first) and returns the minimal penalty.
-    fn select_best_among_inconsistent(&mut self, p: &CombinedProfile, read_matches: &ReadMatches, best: &mut Vec<u32>) -> f64 {
+    fn select_best_among_inconsistent(
+        &mut self,
+        p: &CombinedProfile,
+        read_matches: &ReadMatches,
+        best: &mut Vec<u32>,
+    ) -> f64 {
         let m = self.m();
         let (minor, major) = (m.minor_exon_extension as i64, m.major_exon_extension as i64);
         let mut scores: SmallVec<[(u32, f64); 8]> = SmallVec::new();
@@ -250,7 +264,7 @@ mod tests {
     /// U6 cases routed to `match_inconsistent` by 4.1 can only be told apart by running the
     /// dispatch; this harness runs every case whose expected atype is inconsistent* (or all
     /// cases with `IQRS_U6B_ALL=1`) and reports exact / mismatch with a few diffs.
-    /// `cargo test --release -p iq_assign [--features quirks41] u6b_inconsistent -- --ignored --nocapture`
+    /// `cargo test --release -p iq_assign u6b_inconsistent -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn u6b_inconsistent() {

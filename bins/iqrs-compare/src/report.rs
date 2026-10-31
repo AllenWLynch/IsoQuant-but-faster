@@ -169,7 +169,9 @@ impl Report {
         let mut fmap = std::collections::HashMap::new();
         if let Some(Value::Array(ms)) = floor.and_then(|f| f.get("metrics")) {
             for m in ms {
-                if let (Some(n), Some(d)) = (m.get("name").and_then(Value::as_str), m.get("deficit").and_then(Value::as_f64)) {
+                if let (Some(n), Some(d)) =
+                    (m.get("name").and_then(Value::as_str), m.get("deficit").and_then(Value::as_f64))
+                {
                     fmap.insert(n.to_string(), d);
                 }
             }
@@ -203,8 +205,12 @@ impl Report {
         if e == 0 {
             return format!("{p}/{n} pass");
         }
-        let mut devs: Vec<&str> =
-            self.metrics.iter().filter(|m| m.verdict() == Some("explained")).filter_map(|m| m.explained.as_deref()).collect();
+        let mut devs: Vec<&str> = self
+            .metrics
+            .iter()
+            .filter(|m| m.verdict() == Some("explained"))
+            .filter_map(|m| m.explained.as_deref())
+            .collect();
         devs.sort_unstable();
         devs.dedup();
         format!("{p}/{n} pass, {e} explained ({}), {} fail", devs.join(", "), n - p - e)
@@ -241,7 +247,10 @@ impl Report {
             if !ms.is_empty() {
                 o += "| metric | ref | test | value | deviation | threshold | floor | verdict |\n|---|---|---|---|---|---|---|---|\n";
                 for m in ms {
-                    let opt = |v: Option<f64>| v.map(|v| fmt_val(v, if m.unit == "pp" || m.unit == "rel" { "frac" } else { m.unit })).unwrap_or_default();
+                    let opt = |v: Option<f64>| {
+                        v.map(|v| fmt_val(v, if m.unit == "pp" || m.unit == "rel" { "frac" } else { m.unit }))
+                            .unwrap_or_default()
+                    };
                     o += &format!(
                         "| {} | {} | {} | {} | {} | {} | {} | {} |\n",
                         m.name,

@@ -3,7 +3,7 @@
 //! State the cases do not carry is reconstructed from the capture itself:
 //! - `gff_dump` records the exon-id counter but not the `FeatureIdStorage` dict. The dict
 //!   before a block = annotation `exon_id`s (parsed GFF3, `iq_annot`) + every novel exon id
-//!   *created* (printed bare under 4.1, D-O1) by earlier `gff_dump` cases of the chromosome.
+//!   *created* (printed bare, as 4.1 does) by earlier `gff_dump` cases of the chromosome.
 //!   [`Prescan`] reads those from the recorded lines of the unit file.
 //! - `counter_add_read_info` records the counter state before/after but not the earlier
 //!   reads (sampled at 5%). The runner predicts the read's *delta* on a fresh counter and
@@ -19,15 +19,14 @@ use crate::counter::{FeatureCounter, ReadFate, Strategy};
 use crate::gtf::{BlockAnnot, GtfChrWriter, PrintModel};
 use crate::output::{group_name, ChrCounts};
 use iq_types::fixture::schema::{
-    BlockRef, Case, IndexDump, U20CounterAddIn, U20CounterAddOut, U20CounterDumpIn,
-    U20CounterDumpOut, U20GffDumpIn, U20GffDumpOut,
+    BlockRef, Case, IndexDump, U20CounterAddIn, U20CounterAddOut, U20CounterDumpIn, U20CounterDumpOut, U20GffDumpIn,
+    U20GffDumpOut,
 };
 use iq_types::fixture::{
-    read_lines, unit_files, Diff, DiffEntry, FixError, FixResult, FixtureCtx, Registry,
-    UnitFixture, Verdict,
+    read_lines, unit_files, Diff, DiffEntry, FixError, FixResult, FixtureCtx, Registry, UnitFixture, Verdict,
 };
 use iq_types::serde::{Deserialize, Serialize};
-use iq_types::{AssignmentType, DevId, GroupPool, Iv, Pos, Strand};
+use iq_types::{AssignmentType, GroupPool, Iv, Pos, Strand};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -96,8 +95,7 @@ fn prescan(ctx: &FixtureCtx) -> FixResult<Arc<Prescan>> {
                     *k += 1;
                     p.gff_order.insert((chr.clone(), i.block.block_no), order);
                     for m in &i.models {
-                        p.model_exons
-                            .insert((chr.clone(), i.block.block_no, m.id.clone()), m.exons.len());
+                        p.model_exons.insert((chr.clone(), i.block.block_no, m.id.clone()), m.exons.len());
                     }
                     let Ok(o) = U20GffDumpOut::deserialize(&case.out) else {
                         continue;
@@ -112,22 +110,16 @@ fn prescan(ctx: &FixtureCtx) -> FixResult<Arc<Prescan>> {
                             continue;
                         };
                         if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) {
-                            let (Ok(s), Ok(e)) = (cols[3].parse::<Pos>(), cols[4].parse::<Pos>())
-                            else {
+                            let (Ok(s), Ok(e)) = (cols[3].parse::<Pos>(), cols[4].parse::<Pos>()) else {
                                 continue;
                             };
                             let strand = cols[6].chars().next().unwrap_or('.');
-                            novel
-                                .entry((s, e, strand))
-                                .or_insert((order, id.parse().unwrap_or(0)));
+                            novel.entry((s, e, strand)).or_insert((order, id.parse().unwrap_or(0)));
                         }
                     }
                 }
                 "counter_add_read_info" => {
-                    p.counter_keys
-                        .entry(in_hash(&case.input))
-                        .or_default()
-                        .push(case.case.clone());
+                    p.counter_keys.entry(in_hash(&case.input)).or_default().push(case.case.clone());
                 }
                 _ => {}
             }
@@ -161,25 +153,14 @@ impl<'a> DumpAnnot<'a> {
         let regions = if dump.exon_features.is_empty() {
             FxHashMap::default() // gene_info.empty()
         } else {
-            dump.gene_regions
-                .iter()
-                .map(|(g, iv)| (g.as_str(), *iv))
-                .collect()
+            dump.gene_regions.iter().map(|(g, iv)| (g.as_str(), *iv)).collect()
         };
         DumpAnnot {
             dump,
             models,
             regions,
-            sources: dump
-                .sources
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.as_str()))
-                .collect(),
-            attrs: dump
-                .feature_attributes
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.as_str()))
-                .collect(),
+            sources: dump.sources.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
+            attrs: dump.feature_attributes.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
             ann,
         }
     }
@@ -190,19 +171,13 @@ impl BlockAnnot for DumpAnnot<'_> {
         self.regions.get(self.models[i].gid.as_ref()).copied()
     }
     fn gene_source(&self, i: usize) -> Option<Cow<'_, str>> {
-        self.sources
-            .get(self.models[i].gid.as_ref())
-            .map(|s| Cow::Borrowed(*s))
+        self.sources.get(self.models[i].gid.as_ref()).map(|s| Cow::Borrowed(*s))
     }
     fn gene_attrs(&self, i: usize) -> Option<Cow<'_, str>> {
-        self.attrs
-            .get(self.models[i].gid.as_ref())
-            .map(|s| Cow::Borrowed(*s))
+        self.attrs.get(self.models[i].gid.as_ref()).map(|s| Cow::Borrowed(*s))
     }
     fn tx_attrs(&self, i: usize) -> Option<Cow<'_, str>> {
-        self.attrs
-            .get(self.models[i].tid.as_ref())
-            .map(|s| Cow::Borrowed(*s))
+        self.attrs.get(self.models[i].tid.as_ref()).map(|s| Cow::Borrowed(*s))
     }
     fn exon_key(&self, i: usize, s: Pos, e: Pos, strand: Strand) -> bool {
         let _ = self.dump;
@@ -220,39 +195,26 @@ pub struct U20GffDump;
 impl UnitFixture for U20GffDump {
     const UNIT: &'static str = "U20";
     const FN: &'static str = "gff_dump";
-    const DEVIATIONS: &'static [DevId] = &[DevId::O1];
     type In = U20GffDumpIn;
     type Out = U20GffDumpOut;
 
     fn run(i: &U20GffDumpIn, ctx: &FixtureCtx) -> FixResult<U20GffDumpOut> {
         if i.printer != "transcript_models" {
-            return Err(FixError(
-                "only the transcript_models printer is ported".into(),
-            ));
+            return Err(FixError("only the transcript_models printer is ported".into()));
         }
         let dump = ctx.index_dump(&i.index)?;
-        let ann = iq_annot::fixture::cached_annotation(
-            &iq_annot::fixture::gff3_path(ctx)?,
-            iq_annot::GeneTypes::Isoquant,
-        )?;
+        let ann =
+            iq_annot::fixture::cached_annotation(&iq_annot::fixture::gff3_path(ctx)?, iq_annot::GeneTypes::Isoquant)?;
         let chr = i.block.chr.as_str();
         let pre = prescan(ctx)?;
-        let order = *pre
-            .gff_order
-            .get(&(chr.to_owned(), i.block.block_no))
-            .ok_or("block not in prescan")?;
+        let order = *pre.gff_order.get(&(chr.to_owned(), i.block.block_no)).ok_or("block not in prescan")?;
 
         let mut w = GtfChrWriter::new(chr);
         w.printed_gene_ids = i.printed_gene_ids.iter().cloned().collect();
         if let Some(nov) = pre.novel_exons.get(chr) {
             for (&(s, e, st), &(k, n)) in nov {
                 if k < order {
-                    w.exon_ids.seed(
-                        s,
-                        e,
-                        Strand::parse(&st.to_string()).unwrap_or(Strand::Unknown),
-                        n,
-                    );
+                    w.exon_ids.seed(s, e, Strand::parse(&st.to_string()).unwrap_or(Strand::Unknown), n);
                 }
             }
         }
@@ -267,16 +229,8 @@ impl UnitFixture for U20GffDump {
                 strand: m.strand,
                 exons: Cow::Borrowed(m.exons.as_slice()),
                 source: Cow::Borrowed(m.source.as_str()),
-                other: m
-                    .other_features
-                    .iter()
-                    .map(|(s, e, t)| (*s, *e, Cow::Borrowed(t.as_str())))
-                    .collect(),
-                additional: m
-                    .additional_info
-                    .iter()
-                    .map(|(k, v)| (Cow::Borrowed(k.as_str()), v.clone()))
-                    .collect(),
+                other: m.other_features.iter().map(|(s, e, t)| (*s, *e, Cow::Borrowed(t.as_str()))).collect(),
+                additional: m.additional_info.iter().map(|(k, v)| (Cow::Borrowed(k.as_str()), v.clone())).collect(),
             })
             .collect();
         let annot = DumpAnnot::new(&dump, &models, ann.chrom(chr).map(|c| (&*ann, c)));
@@ -313,11 +267,7 @@ impl From<U20CounterAddOut> for AddDelta {
             .features
             .into_iter()
             .map(|(f, gl)| {
-                let changed = gl
-                    .iter()
-                    .filter(|g| g.1 != g.2)
-                    .map(|g| (g.0.clone(), g.2 - g.1))
-                    .collect();
+                let changed = gl.iter().filter(|g| g.1 != g.2).map(|g| (g.0.clone(), g.2 - g.1)).collect();
                 let present = gl.iter().map(|g| g.0.clone()).collect();
                 (f, changed, present)
             })
@@ -356,14 +306,7 @@ fn read_features(i: &U20CounterAddIn) -> (AssignmentType, Vec<String>) {
             }
         }
     }
-    (
-        if gene {
-            i.assignment.gene_atype
-        } else {
-            i.assignment.atype
-        },
-        feats,
-    )
+    (if gene { i.assignment.gene_atype } else { i.assignment.atype }, feats)
 }
 
 pub struct U20CounterAdd;
@@ -381,21 +324,15 @@ impl UnitFixture for U20CounterAdd {
         }
         let (atype, feats) = read_features(i);
         let group = if i.counter.grouped {
-            let g = i
-                .read_group
-                .get(i.counter.group_index as usize)
-                .ok_or("grouped counter without read group")?;
+            let g = i.read_group.get(i.counter.group_index as usize).ok_or("grouped counter without read group")?;
             g.clone()
         } else {
             "NA".to_owned()
         };
         let ids: Vec<u32> = (0..feats.len() as u32).collect();
         let mut c = FeatureCounter::new();
-        let strategy = if is_gene_counter(&i.counter.name) {
-            Strategy::UniqueSplicingConsistent
-        } else {
-            Strategy::UniqueOnly
-        };
+        let strategy =
+            if is_gene_counter(&i.counter.name) { Strategy::UniqueSplicingConsistent } else { Strategy::UniqueOnly };
         let fate = c.add_features(strategy, atype, !i.assignment.matches.is_empty(), &ids, 0);
         let mut features: Vec<(String, Vec<(String, f64)>, Vec<String>)> = feats
             .iter()
@@ -407,19 +344,11 @@ impl UnitFixture for U20CounterAdd {
                     Some(s) if s.touched && s.total != 0.0 => vec![(group.clone(), s.total)],
                     _ => vec![],
                 };
-                (
-                    f.clone(),
-                    changed,
-                    if touched { vec![group.clone()] } else { vec![] },
-                )
+                (f.clone(), changed, if touched { vec![group.clone()] } else { vec![] })
             })
             .collect();
         features.sort_by(|a, b| a.0.cmp(&b.0));
-        let confirmed = if fate == ReadFate::Unique {
-            vec![feats[0].clone()]
-        } else {
-            vec![]
-        };
+        let confirmed = if fate == ReadFate::Unique { vec![feats[0].clone()] } else { vec![] };
         Ok(AddDelta {
             features,
             ambiguous: c.ambiguous as i64,
@@ -431,13 +360,8 @@ impl UnitFixture for U20CounterAdd {
 
     fn compare(got: &AddDelta, want: &AddDelta, ctx: &FixtureCtx) -> Verdict {
         let mut entries = Vec::new();
-        let mut e = |path: &str, g: String, w: String| {
-            entries.push(DiffEntry {
-                path: path.to_owned(),
-                got: g,
-                want: w,
-            })
-        };
+        let mut e =
+            |path: &str, g: String, w: String| entries.push(DiffEntry { path: path.to_owned(), got: g, want: w });
         let gf: Vec<&String> = got.features.iter().map(|f| &f.0).collect();
         let wf: Vec<&String> = want.features.iter().map(|f| &f.0).collect();
         if gf != wf {
@@ -445,52 +369,28 @@ impl UnitFixture for U20CounterAdd {
         } else {
             for (g, w) in got.features.iter().zip(&want.features) {
                 if g.1 != w.1 {
-                    e(
-                        &format!("features.{}.delta", g.0),
-                        format!("{:?}", g.1),
-                        format!("{:?}", w.1),
-                    );
+                    e(&format!("features.{}.delta", g.0), format!("{:?}", g.1), format!("{:?}", w.1));
                 }
                 if !g.2.iter().all(|x| w.2.contains(x)) {
-                    e(
-                        &format!("features.{}.present", g.0),
-                        format!("{:?}", g.2),
-                        format!("{:?}", w.2),
-                    );
+                    e(&format!("features.{}.present", g.0), format!("{:?}", g.2), format!("{:?}", w.2));
                 }
                 if w.1.len() > 1 {
-                    e(
-                        &format!("features.{}.multi_change", g.0),
-                        String::new(),
-                        format!("{:?}", w.1),
-                    );
+                    e(&format!("features.{}.multi_change", g.0), String::new(), format!("{:?}", w.1));
                 }
             }
         }
         if got.ambiguous != want.ambiguous {
-            e(
-                "ambiguous",
-                got.ambiguous.to_string(),
-                want.ambiguous.to_string(),
-            );
+            e("ambiguous", got.ambiguous.to_string(), want.ambiguous.to_string());
         }
         if got.not_assigned != want.not_assigned {
-            e(
-                "not_assigned",
-                got.not_assigned.to_string(),
-                want.not_assigned.to_string(),
-            );
+            e("not_assigned", got.not_assigned.to_string(), want.not_assigned.to_string());
         }
         // confirmed_added ⊆ confirmed-by-this-read (exact condition needs the read and model)
         if !want.confirmed.is_empty() {
             match confirm_check(got, ctx) {
                 Ok(conf) => {
                     if !want.confirmed.iter().all(|f| conf.contains(f)) {
-                        e(
-                            "confirmed_added",
-                            format!("{conf:?}"),
-                            format!("{:?}", want.confirmed),
-                        );
+                        e("confirmed_added", format!("{conf:?}"), format!("{:?}", want.confirmed));
                     }
                 }
                 Err(err) => return Verdict::Mismatch(Diff::error(format!("confirm check: {err}"))),
@@ -499,10 +399,7 @@ impl UnitFixture for U20CounterAdd {
         if entries.is_empty() {
             Verdict::Exact
         } else {
-            Verdict::Mismatch(Diff {
-                entries,
-                ..Default::default()
-            })
+            Verdict::Mismatch(Diff { entries, ..Default::default() })
         }
     }
 }
@@ -519,21 +416,11 @@ fn confirm_check(got: &AddDelta, ctx: &FixtureCtx) -> FixResult<Vec<String>> {
     }
     let pre = prescan(ctx)?;
     let v = iq_types::serde_json::to_value(&i)?;
-    let keys = pre
-        .counter_keys
-        .get(&in_hash(&v))
-        .ok_or("case not found in prescan")?;
+    let keys = pre.counter_keys.get(&in_hash(&v)).ok_or("case not found in prescan")?;
     let parsed: FxHashSet<(String, String, String, u32)> = keys
         .iter()
         .filter_map(|k| iq_types::fixture::CaseKey::parse(k))
-        .filter_map(|k| {
-            Some((
-                k.sample.to_owned(),
-                k.slice.to_owned(),
-                k.chr.to_owned(),
-                k.block_no?,
-            ))
-        })
+        .filter_map(|k| Some((k.sample.to_owned(), k.slice.to_owned(), k.chr.to_owned(), k.block_no?)))
         .collect();
     if parsed.len() != 1 {
         return Err(format!("ambiguous case identity ({} blocks)", parsed.len()).into());
@@ -541,25 +428,13 @@ fn confirm_check(got: &AddDelta, ctx: &FixtureCtx) -> FixResult<Vec<String>> {
     let (sample, slice, chr, block_no) = parsed.into_iter().next().unwrap();
     let read_idx = i.read.as_ref().ok_or("no read")?.read_idx as usize;
     let tid = &got.confirmed[0];
-    let n_exons = *pre
-        .model_exons
-        .get(&(chr.clone(), block_no, tid.clone()))
-        .ok_or("model not printed in block")?;
+    let n_exons = *pre.model_exons.get(&(chr.clone(), block_no, tid.clone())).ok_or("model not printed in block")?;
     if n_exons <= 1 {
         return Ok(got.confirmed.clone());
     }
-    let block = ctx.block(&BlockRef {
-        sample,
-        slice,
-        chr,
-        block_no,
-    })?;
+    let block = ctx.block(&BlockRef { sample, slice, chr, block_no })?;
     let rec = block.records.get(read_idx).ok_or("read_idx out of range")?;
-    Ok(if rec.corrected_exons.len() > 1 {
-        got.confirmed.clone()
-    } else {
-        vec![]
-    })
+    Ok(if rec.corrected_exons.len() > 1 { got.confirmed.clone() } else { vec![] })
 }
 
 // ------------------------------------------------------------------------------------------
@@ -620,37 +495,20 @@ impl UnitFixture for U20CounterDump {
     }
 
     fn compare(got: &U20CounterDumpOut, want: &U20CounterDumpOut, _ctx: &FixtureCtx) -> Verdict {
-        let want: Vec<&(String, String)> = want
-            .files
-            .iter()
-            .filter(|f| !f.0.ends_with(".usable"))
-            .collect();
+        let want: Vec<&(String, String)> = want.files.iter().filter(|f| !f.0.ends_with(".usable")).collect();
         let got: Vec<&(String, String)> = got.files.iter().collect();
         if got == want {
             return Verdict::Exact;
         }
         let mut entries = Vec::new();
         for k in 0..got.len().max(want.len()) {
-            let g = got
-                .get(k)
-                .map(|f| format!("{}: {}", f.0, f.1))
-                .unwrap_or_default();
-            let w = want
-                .get(k)
-                .map(|f| format!("{}: {}", f.0, f.1))
-                .unwrap_or_default();
+            let g = got.get(k).map(|f| format!("{}: {}", f.0, f.1)).unwrap_or_default();
+            let w = want.get(k).map(|f| format!("{}: {}", f.0, f.1)).unwrap_or_default();
             if g != w {
-                entries.push(DiffEntry {
-                    path: format!("files[{k}]"),
-                    got: g,
-                    want: w,
-                });
+                entries.push(DiffEntry { path: format!("files[{k}]"), got: g, want: w });
             }
         }
-        Verdict::Mismatch(Diff {
-            entries,
-            ..Default::default()
-        })
+        Verdict::Mismatch(Diff { entries, ..Default::default() })
     }
 }
 
@@ -663,7 +521,7 @@ mod e2e {
     use super::*;
     use crate::ids::NovelNamer;
     use crate::output::{assemble, ChrFeat, ChrOutput, OutputSpec};
-    use iq_types::{with_quirks, GeneKey, ModelKind, QuirkSet, TranscriptModel};
+    use iq_types::{GeneKey, ModelKind, TranscriptModel};
     use std::path::Path;
 
     struct Capture {
@@ -676,45 +534,18 @@ mod e2e {
         if files.is_empty() {
             return None;
         }
-        let mut cap = Capture {
-            gff: vec![],
-            dumps: vec![],
-        };
+        let mut cap = Capture { gff: vec![], dumps: vec![] };
         for f in files {
             for case in read_lines::<Case>(&f).unwrap() {
                 let case = case.unwrap();
                 match case.input.get("fn").and_then(|v| v.as_str()) {
-                    Some("gff_dump") => cap
-                        .gff
-                        .push(U20GffDumpIn::deserialize(&case.input).unwrap()),
-                    Some("counter_dump") => cap
-                        .dumps
-                        .push(U20CounterDumpIn::deserialize(&case.input).unwrap()),
+                    Some("gff_dump") => cap.gff.push(U20GffDumpIn::deserialize(&case.input).unwrap()),
+                    Some("counter_dump") => cap.dumps.push(U20CounterDumpIn::deserialize(&case.input).unwrap()),
                     _ => {}
                 }
             }
         }
         Some(cap)
-    }
-
-    /// `exon_id "N"` (4.1 first use, D-O1) → `exon_id "<chr>.N"`.
-    fn normalize_o1(text: &str, chr: &str) -> String {
-        let mut out = String::with_capacity(text.len());
-        for line in text.split_inclusive('\n') {
-            if let Some(i) = line.find("exon_id \"") {
-                let j = i + 9;
-                let k = j + line[j..].find('"').unwrap();
-                if line[j..k].bytes().all(|b| b.is_ascii_digit()) {
-                    out.push_str(&line[..j]);
-                    out.push_str(chr);
-                    out.push('.');
-                    out.push_str(&line[j..]);
-                    continue;
-                }
-            }
-            out.push_str(line);
-        }
-        out
     }
 
     fn rename_attr(line: &str, key: &str, map: &FxHashMap<String, String>) -> String {
@@ -731,10 +562,7 @@ mod e2e {
     }
 
     fn run_capture(sample: &str) {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../fixtures")
-            .join(sample)
-            .join("fullchr8");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures").join(sample).join("fullchr8");
         let Some(cap) = load(&root) else {
             eprintln!("skipping: no capture at {}", root.display());
             return;
@@ -749,19 +577,11 @@ mod e2e {
         let chr_idx = ann.chrom(chr);
         let out_dir = root.join("outputs");
         let want_gtf = std::fs::read_to_string(out_dir.join("OUT.transcript_models.gtf")).unwrap();
-        let want_counts =
-            std::fs::read_to_string(out_dir.join("OUT.discovered_transcript_counts.tsv")).unwrap();
-        let want_grouped = std::fs::read_to_string(
-            out_dir.join("OUT.discovered_transcript_grouped_tag_HP_counts.linear.tsv"),
-        )
-        .unwrap();
-        let cmd = want_gtf
-            .lines()
-            .nth(1)
-            .unwrap()
-            .strip_prefix("# Command line: ")
-            .unwrap()
-            .to_owned();
+        let want_counts = std::fs::read_to_string(out_dir.join("OUT.discovered_transcript_counts.tsv")).unwrap();
+        let want_grouped =
+            std::fs::read_to_string(out_dir.join("OUT.discovered_transcript_grouped_tag_HP_counts.linear.tsv"))
+                .unwrap();
+        let cmd = want_gtf.lines().nth(1).unwrap().strip_prefix("# Command line: ").unwrap().to_owned();
         let spec = OutputSpec {
             dir: PathBuf::new(),
             prefix: "OUT".into(),
@@ -774,11 +594,8 @@ mod e2e {
 
         // counts state of the chromosome (ungrouped + grouped dumps)
         let mut pool = GroupPool::new();
-        let tx_dumps: Vec<&U20CounterDumpIn> = cap
-            .dumps
-            .iter()
-            .filter(|d| d.counter.name.contains("discovered_transcript"))
-            .collect();
+        let tx_dumps: Vec<&U20CounterDumpIn> =
+            cap.dumps.iter().filter(|d| d.counter.name.contains("discovered_transcript")).collect();
         let ung = tx_dumps.iter().find(|d| !d.counter.grouped).unwrap();
         let grp = tx_dumps.iter().find(|d| d.counter.grouped).unwrap();
         let mut counts = counts_from_dump(ung, &mut pool);
@@ -787,7 +604,7 @@ mod e2e {
             counts.entry(&f.id).groups = f.groups.clone();
         }
 
-        // (a) 4.1 ids: sequential printing over all blocks + merge = the 4.1 files (D-O1 normalized)
+        // (a) 4.1 ids: sequential printing over all blocks + merge = the 4.1 files
         let mut gtf = GtfChrWriter::new(chr);
         let mut gtf_ours = GtfChrWriter::new(chr);
         let mut namer = NovelNamer::new(chr, chr_idx.map(|c| ann.forbidden_ids(c)).unwrap_or(&[]));
@@ -808,16 +625,12 @@ mod e2e {
                     strand: m.strand,
                     exons: Cow::Borrowed(m.exons.as_slice()),
                     source: Cow::Borrowed(m.source.as_str()),
-                    other: m
-                        .other_features
-                        .iter()
-                        .map(|(s, e, t)| (*s, *e, Cow::Borrowed(t.as_str())))
-                        .collect(),
+                    other: m.other_features.iter().map(|(s, e, t)| (*s, *e, Cow::Borrowed(t.as_str()))).collect(),
                     additional: vec![],
                 })
                 .collect();
             let annot = DumpAnnot::new(&dump, &pms, chr_idx.map(|c| (&*ann, c)));
-            with_quirks(QuirkSet::NONE, || gtf.dump_block(&annot, &pms, &mut text41));
+            gtf.dump_block(&annot, &pms, &mut text41);
 
             // (b) our names (D-M1 renumbering) for the same models
             let mut novel_genes: Vec<&str> = Vec::new();
@@ -829,22 +642,16 @@ mod e2e {
                     key: k as u32,
                     strand: m.strand,
                     gene: if m.gene.starts_with("novel_gene_") {
-                        let p = novel_genes
-                            .iter()
-                            .position(|x| *x == m.gene)
-                            .unwrap_or_else(|| {
-                                novel_genes.push(&m.gene);
-                                novel_genes.len() - 1
-                            });
+                        let p = novel_genes.iter().position(|x| *x == m.gene).unwrap_or_else(|| {
+                            novel_genes.push(&m.gene);
+                            novel_genes.len() - 1
+                        });
                         GeneKey::Novel(p as u32)
                     } else {
-                        let p = gene_strs
-                            .iter()
-                            .position(|x| *x == m.gene)
-                            .unwrap_or_else(|| {
-                                gene_strs.push(m.gene.clone());
-                                gene_strs.len() - 1
-                            });
+                        let p = gene_strs.iter().position(|x| *x == m.gene).unwrap_or_else(|| {
+                            gene_strs.push(m.gene.clone());
+                            gene_strs.len() - 1
+                        });
                         GeneKey::Ref(p as u32)
                     },
                     kind: match m.ty {
@@ -859,23 +666,14 @@ mod e2e {
                     source_known: None,
                 })
                 .collect();
-            let names = namer.name_block(
-                &models,
-                |t| g.models[t as usize].id.as_str(),
-                |x| gene_strs[x as usize].as_str(),
-            );
+            let names =
+                namer.name_block(&models, |t| g.models[t as usize].id.as_str(), |x| gene_strs[x as usize].as_str());
             for (k, m) in g.models.iter().enumerate() {
                 for (a, b) in [(&m.id, &names.tx[k]), (&m.gene, &names.gene[k])] {
                     let prev = map.insert(a.clone(), b.clone());
-                    assert!(
-                        prev.is_none() || prev.as_ref() == Some(b),
-                        "{a} renamed inconsistently"
-                    );
+                    assert!(prev.is_none() || prev.as_ref() == Some(b), "{a} renamed inconsistently");
                     let prevb = back.insert(b.clone(), a.clone());
-                    assert!(
-                        prevb.is_none() || prevb.as_ref() == Some(a),
-                        "{b} assigned to two ids"
-                    );
+                    assert!(prevb.is_none() || prevb.as_ref() == Some(a), "{b} assigned to two ids");
                 }
             }
             let pms2: Vec<PrintModel<'_>> = pms
@@ -888,68 +686,32 @@ mod e2e {
                 })
                 .collect();
             let annot2 = DumpAnnot::new(&dump, &pms2, chr_idx.map(|c| (&*ann, c)));
-            with_quirks(QuirkSet::NONE, || {
-                gtf_ours.dump_block(&annot2, &pms2, &mut text_ours)
-            });
+            gtf_ours.dump_block(&annot2, &pms2, &mut text_ours);
         }
-        let t = assemble(
-            &spec,
-            &[ChrOutput {
-                chr: chr.into(),
-                gtf: text41,
-                counts: counts.clone(),
-            }],
-            &pool,
-            0,
-        );
-        let want_gtf_n = normalize_o1(&want_gtf, chr);
-        assert!(
-            String::from_utf8(t.gtf).unwrap() == want_gtf_n,
-            "{sample}: GTF differs"
-        );
+        let t = assemble(&spec, &[ChrOutput { chr: chr.into(), gtf: text41, counts: counts.clone() }], &pool, 0);
+        let want_gtf_n = want_gtf.clone();
+        assert!(String::from_utf8(t.gtf).unwrap() == want_gtf_n, "{sample}: GTF differs");
         assert!(t.counts == want_counts, "{sample}: counts differ");
-        assert!(
-            t.grouped.as_deref() == Some(want_grouped.as_str()),
-            "{sample}: grouped differs"
-        );
+        assert!(t.grouped.as_deref() == Some(want_grouped.as_str()), "{sample}: grouped differs");
 
         // (b) renumbered output == 4.1 output with ids mapped
         let mut rcounts = ChrCounts::new();
         for f in &counts.feats {
             let id = map.get(&f.id).cloned().unwrap_or_else(|| f.id.clone());
-            *rcounts.entry(&id) = ChrFeat {
-                id: id.clone(),
-                ..f.clone()
-            };
+            *rcounts.entry(&id) = ChrFeat { id: id.clone(), ..f.clone() };
         }
         rcounts.ambiguous = counts.ambiguous;
         rcounts.no_feature = counts.no_feature;
-        let r = assemble(
-            &spec,
-            &[ChrOutput {
-                chr: chr.into(),
-                gtf: text_ours,
-                counts: rcounts,
-            }],
-            &pool,
-            0,
-        );
+        let r = assemble(&spec, &[ChrOutput { chr: chr.into(), gtf: text_ours, counts: rcounts }], &pool, 0);
         let renamed_gtf: String = want_gtf_n
             .split_inclusive('\n')
             .map(|l| rename_attr(&rename_attr(l, "transcript_id", &map), "gene_id", &map))
             .collect();
-        assert!(
-            String::from_utf8(r.gtf).unwrap() == renamed_gtf,
-            "{sample}: renumbered GTF differs"
-        );
+        assert!(String::from_utf8(r.gtf).unwrap() == renamed_gtf, "{sample}: renumbered GTF differs");
         let resort = |text: &str, ncol: usize| -> String {
             let mut lines: Vec<String> = text.lines().map(|l| l.to_owned()).collect();
             let head = lines.remove(0);
-            let mut stats: Vec<String> = lines
-                .iter()
-                .filter(|l| l.starts_with("__"))
-                .cloned()
-                .collect();
+            let mut stats: Vec<String> = lines.iter().filter(|l| l.starts_with("__")).cloned().collect();
             let mut rows: Vec<(String, String)> = lines
                 .iter()
                 .filter(|l| !l.starts_with("__"))
@@ -970,19 +732,9 @@ mod e2e {
             }
             out
         };
-        assert!(
-            r.counts == resort(&want_counts, 2),
-            "{sample}: renumbered counts differ"
-        );
-        assert!(
-            r.grouped.unwrap() == resort(&want_grouped, 3),
-            "{sample}: renumbered grouped differs"
-        );
-        assert!(
-            map.keys()
-                .any(|k| k.contains(".nic") || k.contains(".nnic")),
-            "no novel models"
-        );
+        assert!(r.counts == resort(&want_counts, 2), "{sample}: renumbered counts differ");
+        assert!(r.grouped.unwrap() == resort(&want_grouped, 3), "{sample}: renumbered grouped differs");
+        assert!(map.keys().any(|k| k.contains(".nic") || k.contains(".nnic")), "no novel models");
     }
 
     #[test]

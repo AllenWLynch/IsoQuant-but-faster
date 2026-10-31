@@ -1,3 +1,5 @@
-target/
-*.jsonl.gz
+/target/
 __pycache__/
+# fixture captures (large, regenerated with dev/harness); small unit-test data is tracked
+*.jsonl.gz
+!crates/*/tests/data/**/*.jsonl.gz

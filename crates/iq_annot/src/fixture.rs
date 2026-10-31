@@ -15,7 +15,7 @@ use iq_types::fixture::schema::{
 };
 use iq_types::fixture::{Diff, DiffEntry, FixError, FixResult, FixtureCtx, IdMaps, TxSpace, UnitFixture, Verdict};
 use iq_types::serde::{Deserialize, Serialize};
-use iq_types::{DevId, GeneKey, IsoRef, IsoformIndex};
+use iq_types::{GeneKey, IsoRef, IsoformIndex};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -147,7 +147,6 @@ pub struct U1Dump;
 impl UnitFixture for U1Dump {
     const UNIT: &'static str = "U1";
     const FN: &'static str = "dump_annotation";
-    const DEVIATIONS: &'static [DevId] = &[DevId::A1];
     type In = U1DumpAnnotationIn;
     type Out = U1DumpAnnotationOut;
     fn run(input: &Self::In, _ctx: &FixtureCtx) -> FixResult<Self::Out> {
@@ -183,7 +182,6 @@ pub struct U1Region;
 impl UnitFixture for U1Region {
     const UNIT: &'static str = "U1";
     const FN: &'static str = "get_gene_info_for_region";
-    const DEVIATIONS: &'static [DevId] = &[DevId::R1];
     type In = U1GeneInfoForRegionIn;
     type Out = RegionOut;
     fn run(input: &Self::In, ctx: &FixtureCtx) -> FixResult<Self::Out> {
@@ -208,7 +206,11 @@ impl UnitFixture for U1Region {
     fn compare(got: &Self::Out, want: &Self::Out, ctx: &FixtureCtx) -> Verdict {
         let mut extra = Vec::new();
         if got.gene_ids != want.gene_ids {
-            extra.push(DiffEntry { path: "gene_ids".into(), got: format!("{:?}", got.gene_ids), want: format!("{:?}", want.gene_ids) });
+            extra.push(DiffEntry {
+                path: "gene_ids".into(),
+                got: format!("{:?}", got.gene_ids),
+                want: format!("{:?}", want.gene_ids),
+            });
         }
         if got.empty != want.empty {
             extra.push(DiffEntry { path: "empty".into(), got: got.empty.to_string(), want: want.empty.to_string() });

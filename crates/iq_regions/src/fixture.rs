@@ -10,8 +10,7 @@
 //! - `genes_in_region`: the gene-query double below on the recorded region.
 //!
 //! Gene queries use a double built from `fixtures/annotation/U1.annotation.jsonl.gz`
-//! ([`AnnGenes`]); it mirrors `iq_annot::AnnotationIndex::genes_for_region0`, including the
-//! D-R1 gate, so default-mode mismatches can be attributed.
+//! ([`AnnGenes`]); it mirrors `iq_annot::AnnotationIndex::genes_for_region0` (0-based query as in 4.1).
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -21,7 +20,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use iq_types::fixture::schema::*;
 use iq_types::fixture::{open_lines, FixError, FixResult, FixtureCtx, Registry, UnitFixture, Verdict};
 use iq_types::serde::Deserialize;
-use iq_types::{quirk, Cluster, DevId, GeneIdx, Iv0, RecordLite};
+use iq_types::{Cluster, GeneIdx, Iv0, RecordLite};
 
 use crate::pass_a::{GeneOracle, PassA, PassAConfig, PassAResult};
 use crate::split::{coverage_cutoff, is_small_chr, skip_read_fraction, split_coverage_regions, CoverageBins};
@@ -32,8 +31,6 @@ pub(crate) fn register_fixtures(reg: &mut Registry) {
     reg.add::<U3Process>();
     reg.add::<U3Genes>();
 }
-
-const DEVS: &[DevId] = &[DevId::R1];
 
 // ---------------------------------------------------------------- gene query double
 
@@ -47,19 +44,9 @@ pub(crate) struct AnnGenes {
 impl GeneOracle for AnnGenes {
     fn genes_for_region0(&self, r: Iv0, out: &mut Vec<GeneIdx>) {
         for (i, &(s, e)) in self.iv.iter().enumerate() {
-            let hit = if quirk(DevId::R1) {
-                // 4.1: 0-based tuple straight into gffutils region(); a falsy start drops the
-                // lower bound and leaves `start < end` (same as iq_annot)
-                if r.s == 0 {
-                    s < r.e
-                } else {
-                    s <= r.e && e >= r.s
-                }
-            } else {
-                // 1-based query (s+1, e+1)
-                let (qs, qe) = (r.s + 1, r.e + 1);
-                s <= qe && e >= qs
-            };
+            // 4.1: 0-based tuple straight into gffutils region(); a falsy start drops the
+            // lower bound and leaves `start < end` (same as iq_annot)
+            let hit = if r.s == 0 { s < r.e } else { s <= r.e && e >= r.s };
             if hit {
                 out.push(i as GeneIdx);
             }
@@ -183,15 +170,7 @@ fn for_each_bam_record(path: &Path, chr: &str, mut f: impl FnMut(u64, &RecordLit
             cigar.push(u32::from_le_bytes(buf[o..o + 4].try_into().unwrap()));
         }
         // a `<l_seq>S<ref_len>N` CG placeholder has the true reference length: fine for end0
-        let rec = RecordLite {
-            qname: &buf[32..name_end - 1],
-            flag,
-            pos0,
-            mapq,
-            cigar: &cigar,
-            seq: &[],
-            tag: None,
-        };
+        let rec = RecordLite { qname: &buf[32..name_end - 1], flag, pos0, mapq, cigar: &cigar, seq: &[], tag: None };
         f(chr_len, &rec);
     }
     Ok(chr_len)
@@ -215,11 +194,11 @@ struct ChrPassA {
     genes: Arc<AnnGenes>,
 }
 
-/// Pass A over the capture's slice BAM, cached per (capture, chr, active quirks).
+/// Pass A over the capture's slice BAM, cached per (capture, chr).
 fn chr_pass_a(ctx: &FixtureCtx, chr: &str) -> FixResult<Arc<ChrPassA>> {
-    type Key = (PathBuf, String, bool);
+    type Key = (PathBuf, String);
     static CACHE: OnceLock<Mutex<HashMap<Key, Arc<ChrPassA>>>> = OnceLock::new();
-    let key = (ctx.root.clone(), chr.to_owned(), quirk(DevId::R1));
+    let key = (ctx.root.clone(), chr.to_owned());
     let mut g = CACHE.get_or_init(Default::default).lock().unwrap();
     if let Some(x) = g.get(&key) {
         return Ok(x.clone());
@@ -227,11 +206,14 @@ fn chr_pass_a(ctx: &FixtureCtx, chr: &str) -> FixResult<Arc<ChrPassA>> {
     let genes = ann_genes(ctx, chr)?;
     let params = ctx.params()?;
     let bam = slice_bam(ctx)?;
-    let cutoff_of = |len| coverage_cutoff(chr, len, params.filter.max_coverage_small_chr, params.filter.max_coverage_normal_chr);
+    let cutoff_of =
+        |len| coverage_cutoff(chr, len, params.filter.max_coverage_small_chr, params.filter.max_coverage_normal_chr);
     let mut p = None;
     let chr_len = for_each_bam_record(&bam, chr, |len, r| {
-        p.get_or_insert_with(|| PassA::new(&*genes, PassAConfig { coverage_cutoff: cutoff_of(len), expected_primary: 0 }))
-            .push_lite(r)
+        p.get_or_insert_with(|| {
+            PassA::new(&*genes, PassAConfig { coverage_cutoff: cutoff_of(len), expected_primary: 0 })
+        })
+        .push_lite(r)
     })?;
     let cutoff = cutoff_of(chr_len);
     let res = p.map(|p| p.finish()).unwrap_or_default();
@@ -260,7 +242,6 @@ pub(crate) struct U3Split;
 impl UnitFixture for U3Split {
     const UNIT: &'static str = "U3";
     const FN: &'static str = "split_coverage_regions";
-    const DEVIATIONS: &'static [DevId] = DEVS;
     type In = U3SplitCoverageIn;
     type Out = U3SplitCoverageOut;
     fn run(i: &U3SplitCoverageIn, _ctx: &FixtureCtx) -> FixResult<U3SplitCoverageOut> {
@@ -274,7 +255,8 @@ impl UnitFixture for U3Split {
             }
             _ => (0, vec![]),
         };
-        let splits = split_coverage_regions(i.region, &CoverageBins { first_bin: first, counts: &counts }, i.read_count);
+        let splits =
+            split_coverage_regions(i.region, &CoverageBins { first_bin: first, counts: &counts }, i.read_count);
         Ok(U3SplitCoverageOut { splits })
     }
 }
@@ -283,7 +265,6 @@ pub(crate) struct U3Cluster;
 impl UnitFixture for U3Cluster {
     const UNIT: &'static str = "U3";
     const FN: &'static str = "cluster";
-    const DEVIATIONS: &'static [DevId] = DEVS;
     type In = U3ClusterIn;
     type Out = U3ClusterOut;
     fn run(i: &U3ClusterIn, ctx: &FixtureCtx) -> FixResult<U3ClusterOut> {
@@ -301,12 +282,12 @@ pub(crate) struct U3Process;
 impl UnitFixture for U3Process {
     const UNIT: &'static str = "U3";
     const FN: &'static str = "process_alignments_in_region";
-    const DEVIATIONS: &'static [DevId] = DEVS;
     type In = U3ProcessRegionIn;
     type Out = U3ProcessRegionOut;
     fn run(i: &U3ProcessRegionIn, ctx: &FixtureCtx) -> FixResult<U3ProcessRegionOut> {
         let pa = chr_pass_a(ctx, &i.chr)?;
-        if pa.chr_len != i.chr_len || is_small_chr(&i.chr, pa.chr_len) != i.small_chr || pa.cutoff != i.coverage_cutoff {
+        if pa.chr_len != i.chr_len || is_small_chr(&i.chr, pa.chr_len) != i.small_chr || pa.cutoff != i.coverage_cutoff
+        {
             return Err(FixError(format!(
                 "chromosome setup differs: len {} small {} cutoff {}",
                 pa.chr_len,
@@ -314,7 +295,8 @@ impl UnitFixture for U3Process {
                 pa.cutoff
             )));
         }
-        let found = pa.res.clusters.iter().flat_map(|c| c.blocks.iter()).enumerate().find(|(_, b)| b.region == i.region);
+        let found =
+            pa.res.clusters.iter().flat_map(|c| c.blocks.iter()).enumerate().find(|(_, b)| b.region == i.region);
         let (block_no, skip, genes) = match found {
             Some((n, b)) if b.max_cov as u64 == i.max_coverage => (n as u32, b.skip, b.gene_ids.clone()),
             _ => {
@@ -350,7 +332,6 @@ pub(crate) struct U3Genes;
 impl UnitFixture for U3Genes {
     const UNIT: &'static str = "U3";
     const FN: &'static str = "genes_in_region";
-    const DEVIATIONS: &'static [DevId] = DEVS;
     type In = U3GenesInRegionIn;
     type Out = GeneIdsOut;
     fn run(i: &U3GenesInRegionIn, ctx: &FixtureCtx) -> FixResult<GeneIdsOut> {
@@ -367,20 +348,16 @@ impl UnitFixture for U3Genes {
 mod tests {
     use super::*;
     use crate::pass_a::{pass_a, PassARecord};
-    use iq_types::{with_quirks, QuirkSet};
 
-    /// D-R1 on both sides: a gene whose 1-based start is the base right after the 0-based
-    /// region end bridges a gap only with the 1-based query (iqrs).
+    /// 4.1 queries genes with the 0-based region: a gene whose 1-based start is the base right
+    /// after the 0-based region end does not bridge the gap.
     #[test]
-    fn d_r1_gap_bridge_both_sides() {
+    fn gap_bridge_uses_0based_query() {
         let genes = AnnGenes { ids: vec!["g".into()], iv: vec![(301, 401)] };
         let rec = |s: i64, e: i64| PassARecord { pos0: s, end0: e + 1, flag: 0, name_hash: s as u64 };
         let cfg = PassAConfig { coverage_cutoff: -1, expected_primary: 0 };
         let run = || pass_a([rec(100, 300), rec(400, 500)], &genes, cfg).clusters.len();
-        assert_eq!(with_quirks(QuirkSet::NONE, run), 1);
-        if iq_types::QUIRKS41 {
-            // 4.1: query (100, 300) misses a gene starting at 301
-            assert_eq!(with_quirks(QuirkSet::only(DevId::R1), run), 2);
-        }
+        // query (100, 300) misses a gene starting at 301
+        assert_eq!(run(), 2);
     }
 }

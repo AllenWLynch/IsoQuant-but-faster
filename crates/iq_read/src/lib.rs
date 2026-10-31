@@ -17,7 +17,7 @@ use iq_types::{AlignedRead, Params, RecordLite};
 pub use correct::{assignment_strand, check_antisense, correct_read};
 
 /// `fn process_alignment(&RecordLite) -> Option<AlignedRead>` (U4): CIGAR → blocks,
-/// polyA/T detection and fixing (D-P1, D-P2), boundary deletions (D-P3). `None` when the
+/// polyA/T detection and fixing, boundary deletions. `None` when the
 /// alignment has no exons. Allocates only the output vectors; use
 /// [`process_alignment_into`] to reuse them across reads.
 pub fn process_alignment(rec: &RecordLite<'_>, params: &Params) -> Option<AlignedRead> {
@@ -53,8 +53,16 @@ pub fn process_alignment_into(
         polya::add_polya_info(rec, p, ext, &mut out.exons, &mut out.read_blocks, &mut out.cigar_blocks);
     out.polya = info;
     out.exons_changed = changed;
-    let anchor = deletions::deletion_anchor(rec.pos0, out.exons[0].s);
-    deletions::extract_relevant_deletions_into(rec.cigar, anchor, &out.exons, deletions::BOUNDARY_MARGIN, &mut out.deletions);
+    // Matches IsoQuant 4.1: deletions are anchored at the post-polyT-trim first exon start
+    // (`alignment_processor.py:422,499`), not at `reference_start + 1`.
+    let anchor = out.exons[0].s;
+    deletions::extract_relevant_deletions_into(
+        rec.cigar,
+        anchor,
+        &out.exons,
+        deletions::BOUNDARY_MARGIN,
+        &mut out.deletions,
+    );
     true
 }
 

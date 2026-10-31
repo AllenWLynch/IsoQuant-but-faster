@@ -125,9 +125,7 @@ impl IsoformMatch {
 
     /// `monoexon_is_consistent` (IA:536-538).
     pub fn monoexon_is_consistent(&self) -> bool {
-        self.events
-            .iter()
-            .all(|e| matches!(e.ty, EventType::None | EventType::MonoExonic | EventType::MonoExonMatch))
+        self.events.iter().all(|e| matches!(e.ty, EventType::None | EventType::MonoExonic | EventType::MonoExonMatch))
     }
 }
 
@@ -226,7 +224,13 @@ mod tests {
         );
         assert_eq!(x.events.len(), 1);
         let mut y = IsoformMatch::new_single(
-            MatchClass::Undefined, None, None, MatchEvent::new(EventType::Undefined), Strand::Plus, 0.0);
+            MatchClass::Undefined,
+            None,
+            None,
+            MatchEvent::new(EventType::Undefined),
+            Strand::Plus,
+            0.0,
+        );
         y.add_event(MatchEvent::new(EventType::AlignedPolyaTail));
         assert_eq!(y.events.len(), 1);
         x.add_event(MatchEvent::new(EventType::AlignedPolyaTail));

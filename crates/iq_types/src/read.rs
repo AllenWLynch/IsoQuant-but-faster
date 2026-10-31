@@ -3,7 +3,7 @@
 //! pass-A blocks (U3).
 
 use crate::assign::Assignment;
-use crate::prim::{GeneIdx, Iv, Iv0, Pos, PolyAInfo, Strand};
+use crate::prim::{GeneIdx, Iv, Iv0, PolyAInfo, Pos, Strand};
 use serde::{Deserialize, Serialize};
 
 // ------------------------------------------------------------------------------------------

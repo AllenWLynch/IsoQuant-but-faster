@@ -14,7 +14,9 @@
 
 use iq_types::indexmap::IndexMap;
 use iq_types::model::vertex_code as vc;
-use iq_types::{BlockStore, ChainTable, IntronGraph, IsoRef, IsoformIndex, Iv, Params, Path, PathStorage, Strand, Vertex};
+use iq_types::{
+    BlockStore, ChainTable, IntronGraph, IsoRef, IsoformIndex, Iv, Params, Path, PathStorage, Strand, Vertex,
+};
 use std::collections::{HashMap, HashSet};
 
 /// Terminal-side summary of one intron vertex (one of outgoing / incoming).
@@ -97,8 +99,10 @@ fn summarize(targets: &[Vertex], right: bool) -> Side {
 impl<'g> PathProcessor<'g> {
     /// Precomputes per-vertex terminal summaries (once per graph).
     pub fn new(graph: &'g IntronGraph, params: &Params) -> Self {
-        let right = graph.outgoing.iter().filter(|(k, _)| !k.is_terminal()).map(|(k, t)| (*k, summarize(t, true))).collect();
-        let left = graph.incoming.iter().filter(|(k, _)| !k.is_terminal()).map(|(k, t)| (*k, summarize(t, false))).collect();
+        let right =
+            graph.outgoing.iter().filter(|(k, _)| !k.is_terminal()).map(|(k, t)| (*k, summarize(t, true))).collect();
+        let left =
+            graph.incoming.iter().filter(|(k, _)| !k.is_terminal()).map(|(k, t)| (*k, summarize(t, false))).collect();
         PathProcessor {
             graph,
             discarded: graph.discarded_introns.iter().copied().collect(),
@@ -308,7 +312,9 @@ pub(crate) fn register_fixtures(reg: &mut iq_types::fixture::Registry) {
 
 pub mod fixture {
     use super::*;
-    use iq_types::fixture::schema::{GraphFixture, U11GraphOut, U12FillIn, U12FillOut, U12KnownSplicedIn, U12KnownSplicedOut};
+    use iq_types::fixture::schema::{
+        GraphFixture, U11GraphOut, U12FillIn, U12FillOut, U12KnownSplicedIn, U12KnownSplicedOut,
+    };
     use iq_types::fixture::{read_lines, unit_files, Case, FixError, FixResult, FixtureCtx, UnitFixture};
     use iq_types::serde_json;
     use std::path::PathBuf;
@@ -398,7 +404,14 @@ mod tests {
         fn get(m: &IndexMap<Vertex, Vec<Vertex>>, v: Vertex, t: Option<i64>) -> Vec<Vertex> {
             let mut r: Vec<Vertex> = match m.get(&v) {
                 None => return vec![],
-                Some(l) => l.iter().copied().filter(|x| match t { None => x.0 >= 0, Some(t) => x.0 == t }).collect(),
+                Some(l) => l
+                    .iter()
+                    .copied()
+                    .filter(|x| match t {
+                        None => x.0 >= 0,
+                        Some(t) => x.0 == t,
+                    })
+                    .collect(),
             };
             r.sort();
             r
@@ -434,7 +447,14 @@ mod tests {
                 None
             }
         }
-        pub fn starts(g: &IntronGraph, intron: Vertex, start: i64, trusted: bool, apa: i64, delta: i64) -> Option<Vertex> {
+        pub fn starts(
+            g: &IntronGraph,
+            intron: Vertex,
+            start: i64,
+            trusted: bool,
+            apa: i64,
+            delta: i64,
+        ) -> Option<Vertex> {
             let polyts = get(&g.incoming, intron, Some(vc::POLYT));
             if trusted {
                 if let Some(v) = polyts.iter().find(|v| (v.1 - start).abs() <= apa) {
@@ -521,7 +541,11 @@ mod tests {
             }
             for x in 750..1050 {
                 for t in [false, true] {
-                    assert_eq!(proc.thread_starts(v, x, t), naive::starts(&g, v, x, t, apa, delta), "start {x} {t} {g:?}");
+                    assert_eq!(
+                        proc.thread_starts(v, x, t),
+                        naive::starts(&g, v, x, t, apa, delta),
+                        "start {x} {t} {g:?}"
+                    );
                 }
             }
             // vertex missing from the graph

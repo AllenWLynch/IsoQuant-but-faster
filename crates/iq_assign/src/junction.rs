@@ -250,7 +250,9 @@ impl<'a> JunctionComparator<'a> {
         if read_present.contains(&-1) || iso_present.contains(&-1) {
             // detect_contradiction_type (:161-181)
             for &(rc, ic) in &pairs {
-                if let Some(ev) = self.compare_overlapping_contradictional_regions(read_region, read_j, iso_region, iso_j, rc, ic) {
+                if let Some(ev) =
+                    self.compare_overlapping_contradictional_regions(read_region, read_j, iso_region, iso_j, rc, ic)
+                {
                     events.push(ev);
                 }
             }
@@ -280,7 +282,11 @@ impl<'a> JunctionComparator<'a> {
             let intron = iso_j[us(ic.0)];
             if read_region.contains(&intron) {
                 if intron.len() <= p.micro_intron_length as i64
-                    && contains_well_inside(preceding_exon(read_region, read_j, us(rc.1)), intron, p.minimal_exon_overlap)
+                    && contains_well_inside(
+                        preceding_exon(read_region, read_j, us(rc.1)),
+                        intron,
+                        p.minimal_exon_overlap,
+                    )
                 {
                     return ev(EventType::FakeMicroIntronRetention);
                 }
@@ -300,7 +306,9 @@ impl<'a> JunctionComparator<'a> {
                 return ev(EventType::None);
             } else if rc.0 == 0 && get_exon(read_region, read_j, 0).len() <= p.max_fake_terminal_exon_len as i64 {
                 return Some(MatchEvent::with_regions(EventType::FakeTerminalExonLeft, EXTRA_LEFT_REGION, rc));
-            } else if rc.1 == n as i64 - 1 && get_exon(read_region, read_j, n).len() <= p.max_fake_terminal_exon_len as i64 {
+            } else if rc.1 == n as i64 - 1
+                && get_exon(read_region, read_j, n).len() <= p.max_fake_terminal_exon_len as i64
+            {
                 return Some(MatchEvent::with_regions(EventType::FakeTerminalExonRight, EXTRA_RIGHT_REGION, rc));
             }
             return ev(EventType::ExtraIntronNovel);
@@ -358,7 +366,10 @@ impl<'a> JunctionComparator<'a> {
             let (read_exon, iso_exon) = if r0 == 0 && i0 == 0 {
                 (preceding_exon(read_region, read_j, 0), preceding_exon(iso_region, iso_j, 0))
             } else {
-                (following_exon(read_region, read_j, read_j.len() - 1), following_exon(iso_region, iso_j, iso_j.len() - 1))
+                (
+                    following_exon(read_region, read_j, read_j.len() - 1),
+                    following_exon(iso_region, iso_j, iso_j.len() - 1),
+                )
             };
             event = Some(if (read_exon.len() - iso_exon.len()).abs() < 2 * delta {
                 if r0 == 0 {
@@ -385,7 +396,14 @@ impl<'a> JunctionComparator<'a> {
             });
         } else if surrounded_by_exons && read_introns_inside && single_read && i1 > i0 {
             // skipped exon(s)
-            event = self.classify_skipped_exons(iso_j, i0, i1, intron_length_is_similar, read_introns_known, similar_bounds);
+            event = self.classify_skipped_exons(
+                iso_j,
+                i0,
+                i1,
+                intron_length_is_similar,
+                read_introns_known,
+                similar_bounds,
+            );
         } else if surrounded_by_exons && similar_bounds && r1 > r0 && single_iso {
             // gain exon
             event = Some(if read_introns_known {
@@ -397,11 +415,7 @@ impl<'a> JunctionComparator<'a> {
             });
         } else if surrounded_by_exons && intron_length_is_similar && iso_introns_inside && r1 > r0 && single_iso {
             // exon detach
-            event = Some(if read_introns_known {
-                EventType::ExonDetachKnown
-            } else {
-                EventType::ExonDetachNovel
-            });
+            event = Some(if read_introns_known { EventType::ExonDetachKnown } else { EventType::ExonDetachNovel });
         }
 
         let event = match event {
@@ -524,8 +538,7 @@ impl<'a> JunctionComparator<'a> {
     }
 
     /// `get_mono_exon_subtype` (`:395-425`).
-    fn mono_exon_subtype(&self, read_region: Iv, iso_j: &[Iv], events: &mut Events)
-    {
+    fn mono_exon_subtype(&self, read_region: Iv, iso_j: &[Iv], events: &mut Events) {
         let p = self.p;
         let start = events.len();
         let read_reg = (ABSENT, 0);
@@ -544,7 +557,9 @@ impl<'a> JunctionComparator<'a> {
                     EventType::UnsplicedIntronRetention
                 };
                 events.push(MatchEvent::with_regions(t, ir, read_reg));
-            } else if overlaps_at_least(read_region, intron, p.minor_exon_extension as i64) && !intron.contains(&read_region) {
+            } else if overlaps_at_least(read_region, intron, p.minor_exon_extension as i64)
+                && !intron.contains(&read_region)
+            {
                 let t = if intron.s <= read_region.s {
                     EventType::IncompleteIntronRetentionLeft
                 } else {
@@ -566,8 +581,7 @@ impl<'a> JunctionComparator<'a> {
         read_region: Iv,
         read_j: &[Iv],
         iso_start: Pos,
-    )
-    {
+    ) {
         let max_fake = self.p.max_fake_terminal_exon_len as i64;
         let mut extra_left = prof[0] == 0;
         let mut extra_right = prof[prof.len() - 1] == 0;
@@ -600,7 +614,11 @@ impl<'a> JunctionComparator<'a> {
                 rp -= 1;
             }
             while rp >= 0 && prof[rp as usize] == 0 {
-                events.push(MatchEvent::with_regions(EventType::ExtraIntronFlankingRight, EXTRA_RIGHT_REGION, (rp, rp)));
+                events.push(MatchEvent::with_regions(
+                    EventType::ExtraIntronFlankingRight,
+                    EXTRA_RIGHT_REGION,
+                    (rp, rp),
+                ));
                 rp -= 1;
             }
         }
@@ -680,9 +698,9 @@ pub(crate) fn are_known_introns_reference(known: &[Iv], delta: i32, sel: &[Iv]) 
 mod tests {
     use super::*;
     use crate::assigner::AssignParams;
+    use iq_types::enums::match_consts::UNDEFINED_REGION;
     use iq_types::fixture::schema::{U6AssignIn, U6AssignOut};
     use iq_types::fixture::{read_cases, FixtureCtx};
-    use iq_types::enums::match_consts::UNDEFINED_REGION;
     use std::path::PathBuf;
 
     fn iv(s: Pos, e: Pos) -> Iv {
@@ -717,7 +735,13 @@ mod tests {
             let mut known: Vec<Iv> = (0..nk)
                 .map(|_| {
                     let s = 100 + rng.next(400);
-                    iv(s, s + { let b = if rng.next(3) == 0 { 8 } else { 200 }; rng.next(b) })
+                    iv(
+                        s,
+                        s + {
+                            let b = if rng.next(3) == 0 { 8 } else { 200 };
+                            rng.next(b)
+                        },
+                    )
                 })
                 .collect();
             known.sort();
@@ -727,9 +751,15 @@ mod tests {
             let mut pos = 90 + rng.next(100);
             let mut read = Vec::new();
             for _ in 0..nr {
-                let len = { let b = if rng.next(3) == 0 { 6 } else { 150 }; rng.next(b) };
+                let len = {
+                    let b = if rng.next(3) == 0 { 6 } else { 150 };
+                    rng.next(b)
+                };
                 read.push(iv(pos, pos + len));
-                pos += len + 2 + { let b = if rng.next(2) == 0 { 4 } else { 80 }; rng.next(b) };
+                pos += len + 2 + {
+                    let b = if rng.next(2) == 0 { 4 } else { 80 };
+                    rng.next(b)
+                };
             }
             // half the time, copy known introns (with jitter) into the read
             if !known.is_empty() && rng.next(2) == 0 {
@@ -791,8 +821,14 @@ mod tests {
     fn mono_exon_cases() {
         let p = params();
         let jc = JunctionComparator::new(&p, &[]);
-        assert_eq!(cmp(&jc, &[], iv(100, 200), &[], iv(50, 300)), vec![(EventType::MonoExonMatch, UNDEFINED_REGION, UNDEFINED_REGION)]);
-        assert_eq!(cmp(&jc, &[], iv(100, 200), &[iv(300, 400)], iv(50, 500)), vec![(EventType::MonoExonic, UNDEFINED_REGION, UNDEFINED_REGION)]);
+        assert_eq!(
+            cmp(&jc, &[], iv(100, 200), &[], iv(50, 300)),
+            vec![(EventType::MonoExonMatch, UNDEFINED_REGION, UNDEFINED_REGION)]
+        );
+        assert_eq!(
+            cmp(&jc, &[], iv(100, 200), &[iv(300, 400)], iv(50, 500)),
+            vec![(EventType::MonoExonic, UNDEFINED_REGION, UNDEFINED_REGION)]
+        );
         let ev = cmp(&jc, &[], iv(100, 1000), &[iv(300, 400), iv(950, 1100), iv(1500, 1600)], iv(50, 2000));
         assert_eq!(
             ev,
@@ -848,8 +884,13 @@ mod tests {
     fn is_jc_event(t: EventType, read_region: (i64, i64)) -> bool {
         use EventType::*;
         match t {
-            ExonElongationLeft | ExonElongationRight | MajorExonElongationLeft | MajorExonElongationRight
-            | TerminalSiteMatchLeft | TerminalSiteMatchRight | TerminalSiteMatchLeftPrecise
+            ExonElongationLeft
+            | ExonElongationRight
+            | MajorExonElongationLeft
+            | MajorExonElongationRight
+            | TerminalSiteMatchLeft
+            | TerminalSiteMatchRight
+            | TerminalSiteMatchLeftPrecise
             | TerminalSiteMatchRightPrecise => false,
             t if (t.code() >= 200 && t.code() <= 300) => false,
             // polyA verification adds these with an undefined read region
@@ -888,14 +929,13 @@ mod tests {
                     let k = dump.isoform_exons.iter().position(|(t, _)| t == tx).expect("tx in index");
                     let mut ev = Events::new();
                     jc.compare_junctions(read_j, read_region, index.iso_introns(k), index.iso[k].span, &mut ev);
-                    let got: Vec<_> =
-                        ev.iter().filter(|e| is_jc_event(e.ty, e.read_region)).map(|e| (e.ty, e.iso_region, e.read_region)).collect();
-                    let exp: Vec<_> = m
-                        .events
+                    let got: Vec<_> = ev
                         .iter()
-                        .filter(|e| is_jc_event(e.t, e.read))
-                        .map(|e| (e.t, e.iso, e.read))
+                        .filter(|e| is_jc_event(e.ty, e.read_region))
+                        .map(|e| (e.ty, e.iso_region, e.read_region))
                         .collect();
+                    let exp: Vec<_> =
+                        m.events.iter().filter(|e| is_jc_event(e.t, e.read)).map(|e| (e.t, e.iso, e.read)).collect();
                     n_match += 1;
                     if got != exp && bad.len() < 20 {
                         bad.push(format!("{} {tx}\n  got  {got:?}\n  want {exp:?}", c.case));
@@ -907,7 +947,10 @@ mod tests {
             }
         }
         let n_bad = n_match >> 40;
-        eprintln!("JC fixture check: {n_case} inconsistent cases, {} matches, {n_bad} mismatching", n_match & ((1 << 40) - 1));
+        eprintln!(
+            "JC fixture check: {n_case} inconsistent cases, {} matches, {n_bad} mismatching",
+            n_match & ((1 << 40) - 1)
+        );
         assert!(bad.is_empty(), "{} mismatches, first:\n{}", n_bad, bad.join("\n"));
     }
 }

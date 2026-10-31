@@ -27,7 +27,9 @@
 //! memset. [`build_profiles`] also validates its per-thread `pmax` cache with an O(K) slice
 //! comparison. [`ProfileBuilder`] precomputes `pmax` once per index and skips that check.
 
-use iq_types::fixture::schema::{U5ConstructProfilesIn, U5ConstructProfilesOut, U5MatchGenomicFeaturesIn, U5MatchGenomicFeaturesOut};
+use iq_types::fixture::schema::{
+    U5ConstructProfilesIn, U5ConstructProfilesOut, U5MatchGenomicFeaturesIn, U5MatchGenomicFeaturesOut,
+};
 use iq_types::fixture::{FixResult, FixtureCtx, UnitFixture};
 use iq_types::params::MatchingParams;
 use iq_types::{CombinedProfile, IsoformIndex, Iv, MappedReadProfile, PolyAInfo, Pos};
@@ -104,7 +106,13 @@ impl ProfParams {
 
 /// `fn build_profiles(&IsoformIndex, &Params, &[Iv], PolyAInfo, &mut Scratch) -> CombinedProfile`
 /// (`CombinedProfileConstructor(gene_info, params).construct_profiles(blocks, polya, _)`).
-pub fn build_profiles(index: &IsoformIndex, params: &MatchingParams, blocks: &[Iv], polya: PolyAInfo, scratch: &mut Scratch) -> CombinedProfile {
+pub fn build_profiles(
+    index: &IsoformIndex,
+    params: &MatchingParams,
+    blocks: &[Iv],
+    polya: PolyAInfo,
+    scratch: &mut Scratch,
+) -> CombinedProfile {
     let mut out = CombinedProfile::default();
     build_profiles_into(index, params, blocks, polya, scratch, &mut out);
     out
@@ -465,7 +473,14 @@ fn overlapping_profile(
 
 /// `NonOverlappingFeaturesProfileConstructor.construct_profile` (`:194-244`), windowed.
 /// `out.read_features` holds the sorted blocks on entry.
-fn nonoverlapping_profile(fv: OverlapView<'_>, min_overlap: i32, delta: i32, polya: Pos, polyt: Pos, out: &mut MappedReadProfile) {
+fn nonoverlapping_profile(
+    fv: OverlapView<'_>,
+    min_overlap: i32,
+    delta: i32,
+    polya: Pos,
+    polyt: Pos,
+    out: &mut MappedReadProfile,
+) {
     let kf = fv.feats;
     let k = kf.len();
     let rf = &out.read_features;
@@ -704,7 +719,12 @@ pub mod dense {
             }
         }
         let range = dense_range(&intron_profile);
-        MappedReadProfile { gene_profile: intron_profile, read_profile, read_features: read_features.to_vec(), gene_profile_range: range }
+        MappedReadProfile {
+            gene_profile: intron_profile,
+            read_profile,
+            read_features: read_features.to_vec(),
+            gene_profile_range: range,
+        }
     }
 
     fn dense_range(p: &[i8]) -> (i32, i32) {
@@ -766,7 +786,14 @@ pub mod dense {
         ind
     }
 
-    fn nonoverlapping(known: &[Iv], min_overlap: i32, delta: i32, blocks: &[Iv], polya: Pos, polyt: Pos) -> MappedReadProfile {
+    fn nonoverlapping(
+        known: &[Iv],
+        min_overlap: i32,
+        delta: i32,
+        blocks: &[Iv],
+        polya: Pos,
+        polyt: Pos,
+    ) -> MappedReadProfile {
         let mut ep = vec![0i8; known.len()];
         let mut rp = vec![0i8; blocks.len()];
         let (mut g, mut r) = (0, 0);
@@ -814,11 +841,21 @@ pub mod dense {
             }
         }
         let range = dense_range(&ep);
-        MappedReadProfile { gene_profile: ep, read_profile: rp, read_features: blocks.to_vec(), gene_profile_range: range }
+        MappedReadProfile {
+            gene_profile: ep,
+            read_profile: rp,
+            read_features: blocks.to_vec(),
+            gene_profile_range: range,
+        }
     }
 
     /// Dense `construct_profiles`.
-    pub fn build_profiles(index: &IsoformIndex, params: &MatchingParams, blocks: &[Iv], polya: PolyAInfo) -> CombinedProfile {
+    pub fn build_profiles(
+        index: &IsoformIndex,
+        params: &MatchingParams,
+        blocks: &[Iv],
+        polya: PolyAInfo,
+    ) -> CombinedProfile {
         let pp = ProfParams::of(params);
         let gene_region = Iv::new(index.start, index.end);
         let mut introns = Vec::new();
@@ -836,9 +873,19 @@ pub mod dense {
         );
         let exon = pp.count_exons.then(|| {
             let mapped = Iv::new(blocks[0].e + pp.delta, blocks[blocks.len() - 1].s - pp.delta);
-            overlapping(&index.exons, gene_region, Absence::Contains, pp.delta, blocks, mapped, polya.ext_a, polya.ext_t)
+            overlapping(
+                &index.exons,
+                gene_region,
+                Absence::Contains,
+                pp.delta,
+                blocks,
+                mapped,
+                polya.ext_a,
+                polya.ext_t,
+            )
         });
-        let split_exon = nonoverlapping(&index.split_exons, pp.minimal_exon_overlap, pp.delta, blocks, polya.ext_a, polya.ext_t);
+        let split_exon =
+            nonoverlapping(&index.split_exons, pp.minimal_exon_overlap, pp.delta, blocks, polya.ext_a, polya.ext_t);
         CombinedProfile { intron, exon, split_exon, polya }
     }
 
@@ -913,7 +960,7 @@ impl UnitFixture for U5MatchGenomicFeatures {
         // `exon_corrector.py:24-27`), not the comparator's `equal_ranges` delta
         // (`params.delta`). The exon corrector is built with the run's params, so the
         // comparator delta is `params.json`'s `delta`. Remove once the harness fix
-        // (CONTRACT_CHANGES.md item 6) is re-captured.
+        // is re-captured.
         let delta = ctx.params()?.matching.delta;
         let features = match_genomic_features(&i.known_features, &i.read_features, delta);
         debug_assert_eq!(features, dense::match_genomic_features(&i.known_features, &i.read_features, delta));
@@ -1020,7 +1067,10 @@ mod tests {
         let blocks = [iv(60, 99), iv(201, 299), iv(401, 450)];
         let mut s = Scratch::default();
         for idx in [&a, &b, &a] {
-            assert_eq!(build_profiles(idx, &p, &blocks, NO_POLYA_INFO, &mut s), dense::build_profiles(idx, &p, &blocks, NO_POLYA_INFO));
+            assert_eq!(
+                build_profiles(idx, &p, &blocks, NO_POLYA_INFO, &mut s),
+                dense::build_profiles(idx, &p, &blocks, NO_POLYA_INFO)
+            );
         }
     }
 
@@ -1068,9 +1118,9 @@ mod tests {
     #[ignore]
     fn bench_profiles() {
         use iq_types::fixture::{read_cases, FixtureCtx};
+        use iq_types::serde_json;
         use std::collections::HashMap;
         use std::time::Instant;
-        use iq_types::serde_json;
         // `IQ_BENCH_CAP` = capture dir; default: the multigene slice of SRR32588720.
         let cap = std::env::var("IQ_BENCH_CAP").map(std::path::PathBuf::from).unwrap_or_else(|_| {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/SRR32588720/multigene")

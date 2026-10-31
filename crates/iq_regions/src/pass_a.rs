@@ -18,8 +18,8 @@ use crate::split::{coverage_cutoff, skip_read_fraction, split_coverage_regions_i
 /// Gene overlap query of one chromosome, as 4.1 issues it (`get_genes_in_region` /
 /// `get_gene_info_for_region`, `alignment_processor.py:583-605`).
 ///
-/// Production: `iq_annot::AnnotationIndex::genes_for_region0(chr, r)`, which is the single
-/// site of D-R1 (iqrs queries the 1-based region `(s+1, e+1)`; 4.1 passed the 0-based tuple).
+/// Production: `iq_annot::AnnotationIndex::genes_for_region0(chr, r)`, which passes the
+/// 0-based tuple as 4.1 does.
 /// Without a gene DB use [`NoGenes`] (4.1 returns the empty set).
 pub trait GeneOracle {
     /// Appends the genes overlapping the 0-based closed storage region `r`, in
@@ -142,8 +142,11 @@ pub struct PassA<G: GeneOracle> {
 
 impl<G: GeneOracle> PassA<G> {
     pub fn new(genes: G, cfg: PassAConfig) -> Self {
-        let dups =
-            if cfg.expected_primary > 0 { DupFilter::with_capacity(cfg.expected_primary) } else { DupFilter::default() };
+        let dups = if cfg.expected_primary > 0 {
+            DupFilter::with_capacity(cfg.expected_primary)
+        } else {
+            DupFilter::default()
+        };
         PassA {
             genes,
             cfg,
@@ -287,12 +290,7 @@ impl<G: GeneOracle> PassA<G> {
         } else {
             &[]
         };
-        split_coverage_regions_into(
-            region,
-            &CoverageBins { first_bin: self.bin_lo, counts },
-            self.n,
-            &mut self.splits,
-        );
+        split_coverage_regions_into(region, &CoverageBins { first_bin: self.bin_lo, counts }, self.n, &mut self.splits);
 
         self.regs.clear();
         self.regs.extend(self.splits.iter().map(|x| x.0));
@@ -360,7 +358,11 @@ impl<G: GeneOracle> PassA<G> {
 }
 
 /// `fn pass_a(records, genes, cfg) -> PassAResult` (U3).
-pub fn pass_a<G: GeneOracle>(records: impl IntoIterator<Item = PassARecord>, genes: G, cfg: PassAConfig) -> PassAResult {
+pub fn pass_a<G: GeneOracle>(
+    records: impl IntoIterator<Item = PassARecord>,
+    genes: G,
+    cfg: PassAConfig,
+) -> PassAResult {
     let mut p = PassA::new(genes, cfg);
     for r in records {
         p.push(r);

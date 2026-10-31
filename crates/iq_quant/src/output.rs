@@ -70,11 +70,7 @@ impl ChrCounts {
             None => {
                 let k = self.feats.len() as u32;
                 self.index.insert(id.to_owned(), k);
-                self.feats.push(ChrFeat {
-                    id: id.to_owned(),
-                    confirmed: true,
-                    ..Default::default()
-                });
+                self.feats.push(ChrFeat { id: id.to_owned(), confirmed: true, ..Default::default() });
                 k
             }
         };
@@ -86,12 +82,7 @@ impl ChrCounts {
     ///
     /// Sums across blocks are `chr_total + block_total`; 4.1 adds read by read. Under
     /// `unique_only` every weight is 0 or 1, so both are exact integers.
-    pub fn add_block(
-        &mut self,
-        counter: &TxCounter,
-        models: &[TranscriptModel],
-        names: &BlockNames,
-    ) {
+    pub fn add_block(&mut self, counter: &TxCounter, models: &[TranscriptModel], names: &BlockNames) {
         for (i, m) in models.iter().enumerate() {
             let Some(s) = counter.state(m.key) else {
                 continue;
@@ -147,10 +138,7 @@ impl ChrCounts {
 
     /// The per-chromosome `.stats` rows.
     pub fn stats_rows(&self, not_aligned: u64) -> String {
-        format!(
-            "__ambiguous\t{}\n__no_feature\t{}\n__not_aligned\t{}\n",
-            self.ambiguous, self.no_feature, not_aligned
-        )
+        format!("__ambiguous\t{}\n__no_feature\t{}\n__not_aligned\t{}\n", self.ambiguous, self.no_feature, not_aligned)
     }
 }
 
@@ -201,26 +189,16 @@ impl<'a> ChrPhaseW<'a> {
             chr_idx,
             namer: NovelNamer::new(chr, forbidden),
             gtf: GtfChrWriter::new(chr),
-            out: ChrOutput {
-                chr: chr.to_owned(),
-                ..Default::default()
-            },
+            out: ChrOutput { chr: chr.to_owned(), ..Default::default() },
         }
     }
 
     /// Consumes the next block (genomic order). Returns the block's final names.
     pub fn add_block(&mut self, b: &BlockOutput<'_>) -> BlockNames {
         let ann = self.ann;
-        let names = self
-            .namer
-            .name_block(b.models, |t| ann.tx_id(t), |g| ann.gene_id(g));
+        let names = self.namer.name_block(b.models, |t| ann.tx_id(t), |g| ann.gene_id(g));
         let pms = print_models(ann, b.models, &names);
-        let annot = AnnotBlock {
-            ann,
-            chr: self.chr_idx,
-            index: b.index,
-            models: b.models,
-        };
+        let annot = AnnotBlock { ann, chr: self.chr_idx, index: b.index, models: b.models };
         self.gtf.dump_block(&annot, &pms, &mut self.out.gtf);
         self.out.counts.add_block(b.counter, b.models, &names);
         names
@@ -268,11 +246,7 @@ pub fn natural_key_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
     let (sa, sb) = (split(a), split(b));
     for (x, y) in sa.iter().zip(sb.iter()) {
-        let o = if x.0 && y.0 {
-            num_cmp(x.1, y.1)
-        } else {
-            x.1.to_lowercase().cmp(&y.1.to_lowercase())
-        };
+        let o = if x.0 && y.0 { num_cmp(x.1, y.1) } else { x.1.to_lowercase().cmp(&y.1.to_lowercase()) };
         if o != Ordering::Equal {
             return o;
         }
@@ -283,10 +257,7 @@ pub fn natural_key_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 /// Chromosome order of the fragments of the file whose basename is `<prefix><suffix>`
 /// (fragments are `<prefix>_<chr with '/'→'_'><suffix>`). Returns indices into `chrs`.
 pub fn fragment_order(prefix: &str, suffix: &str, chrs: &[&str]) -> Vec<usize> {
-    let names: Vec<String> = chrs
-        .iter()
-        .map(|c| format!("{prefix}_{}{suffix}", c.replace('/', "_")))
-        .collect();
+    let names: Vec<String> = chrs.iter().map(|c| format!("{prefix}_{}{suffix}", c.replace('/', "_"))).collect();
     let mut order: Vec<usize> = (0..chrs.len()).collect();
     order.sort_by(|&a, &b| natural_key_cmp(&names[a], &names[b]));
     order
@@ -335,24 +306,13 @@ impl OutputSpec {
     }
     pub fn grouped_path(&self) -> Option<PathBuf> {
         let tag = self.group_tag.as_ref()?;
-        Some(
-            self.grouped_out
-                .clone()
-                .unwrap_or_else(|| self.path(&Self::grouped_suffix(tag))),
-        )
+        Some(self.grouped_out.clone().unwrap_or_else(|| self.path(&Self::grouped_suffix(tag))))
     }
 }
 
 fn open_out(path: &Path, gzip: bool) -> io::Result<Box<dyn Write>> {
     let f = BufWriter::with_capacity(1 << 20, File::create(path)?);
-    Ok(if gzip {
-        Box::new(flate2::write::GzEncoder::new(
-            f,
-            flate2::Compression::default(),
-        ))
-    } else {
-        Box::new(f)
-    })
+    Ok(if gzip { Box::new(flate2::write::GzEncoder::new(f, flate2::Compression::default())) } else { Box::new(f) })
 }
 
 /// The GTF header (`GFFPrinter.__init__` + `common_header`).
@@ -372,12 +332,7 @@ pub struct FinalTexts {
 
 /// Assembles the final file contents from per-chromosome outputs (any order; 4.1 fragment
 /// order is applied here). `not_aligned` = BAM unmapped count (`__not_aligned` when > 0).
-pub fn assemble(
-    spec: &OutputSpec,
-    chrs: &[ChrOutput],
-    pool: &GroupPool,
-    not_aligned: u64,
-) -> FinalTexts {
+pub fn assemble(spec: &OutputSpec, chrs: &[ChrOutput], pool: &GroupPool, not_aligned: u64) -> FinalTexts {
     let names: Vec<&str> = chrs.iter().map(|c| c.chr.as_str()).collect();
     let p = spec.prefix.as_str();
 
@@ -398,10 +353,7 @@ pub fn assemble(
     let amb: u64 = chrs.iter().map(|c| c.counts.ambiguous).sum();
     let nf: u64 = chrs.iter().map(|c| c.counts.no_feature).sum();
     if !chrs.is_empty() {
-        let _ = write!(
-            counts,
-            "__ambiguous\t{amb}\n__no_feature\t{nf}\n__not_aligned\t{not_aligned}\n"
-        );
+        let _ = write!(counts, "__ambiguous\t{amb}\n__no_feature\t{nf}\n__not_aligned\t{not_aligned}\n");
     } else if not_aligned > 0 {
         let _ = writeln!(counts, "__not_aligned\t{not_aligned}");
     }
@@ -412,26 +364,15 @@ pub fn assemble(
             s.push_str("feature_id\tgroup_id\tcount\n");
         }
         for i in fragment_order(p, &OutputSpec::grouped_suffix(tag), &names) {
-            chrs[i]
-                .counts
-                .write_grouped_rows(|g| group_name(pool, g), &mut s);
+            chrs[i].counts.write_grouped_rows(|g| group_name(pool, g), &mut s);
         }
         s
     });
-    FinalTexts {
-        gtf,
-        counts,
-        grouped,
-    }
+    FinalTexts { gtf, counts, grouped }
 }
 
 /// Writes the three output files.
-pub fn write_outputs(
-    spec: &OutputSpec,
-    chrs: &[ChrOutput],
-    pool: &GroupPool,
-    not_aligned: u64,
-) -> io::Result<()> {
+pub fn write_outputs(spec: &OutputSpec, chrs: &[ChrOutput], pool: &GroupPool, not_aligned: u64) -> io::Result<()> {
     std::fs::create_dir_all(&spec.dir)?;
     let t = assemble(spec, chrs, pool, not_aligned);
     let mut w = open_out(&spec.gtf_path(), spec.gzip)?;
@@ -473,11 +414,7 @@ mod tests {
                 // reference: exact rational rounding half-even of k/n*100
                 let num = k as u64 * 100;
                 let (q, r) = (num / n as u64, num % n as u64);
-                let q = if 2 * r > n as u64 || (2 * r == n as u64 && q % 2 == 1) {
-                    q + 1
-                } else {
-                    q
-                };
+                let q = if 2 * r > n as u64 || (2 * r == n as u64 && q % 2 == 1) { q + 1 } else { q };
                 // only valid where k/n is exactly representable or not a tie; ties need exactness
                 if 2 * r == n as u64 && !(n.is_power_of_two()) {
                     continue;
@@ -498,15 +435,10 @@ mod tests {
         assert_eq!(got, ["1", "2", "10", "chrUn/1", "KI270.1", "MT"]);
         // the suffix takes part in the comparison
         let chrs = ["a", "a.t"];
-        let g: Vec<&str> = fragment_order("OUT", ".transcript_models.gtf", &chrs)
-            .iter()
-            .map(|&i| chrs[i])
-            .collect();
+        let g: Vec<&str> = fragment_order("OUT", ".transcript_models.gtf", &chrs).iter().map(|&i| chrs[i]).collect();
         assert_eq!(g, ["a.t", "a"]);
-        let c: Vec<&str> = fragment_order("OUT", ".discovered_transcript_counts.tsv", &chrs)
-            .iter()
-            .map(|&i| chrs[i])
-            .collect();
+        let c: Vec<&str> =
+            fragment_order("OUT", ".discovered_transcript_counts.tsv", &chrs).iter().map(|&i| chrs[i]).collect();
         assert_eq!(c, ["a", "a.t"]);
     }
 
@@ -538,9 +470,7 @@ mod phase_w_tests {
     use super::*;
     use iq_annot::{index_from_genes, parse_gff3_reader, GeneTypes};
     use iq_types::smallvec::smallvec;
-    use iq_types::{
-        with_quirks, AssignmentType, FinalAssign, GeneKey, Iv, ModelKind, QuirkSet, Strand,
-    };
+    use iq_types::{AssignmentType, FinalAssign, GeneKey, Iv, ModelKind, Strand};
 
     const GFF: &str = "##gff-version 3\n\
 8\tens\tgene\t100\t900\t.\t+\t.\tID=gene:G1;Name=g1;biotype=pc;gene_id=G1\n\
@@ -552,13 +482,7 @@ mod phase_w_tests {
 8\tens\tmRNA\t5000\t6000\t.\t-\t.\tID=transcript3.8.nic;Parent=gene:G2\n\
 8\tens\texon\t5000\t6000\t.\t-\t.\tParent=transcript3.8.nic\n";
 
-    fn m(
-        key: u32,
-        kind: ModelKind,
-        gene: GeneKey,
-        strand: Strand,
-        ex: &[(i32, i32)],
-    ) -> TranscriptModel {
+    fn m(key: u32, kind: ModelKind, gene: GeneKey, strand: Strand, ex: &[(i32, i32)]) -> TranscriptModel {
         TranscriptModel {
             key,
             strand,
@@ -580,80 +504,35 @@ mod phase_w_tests {
         let t1 = ann.gene_txs(g1).start;
         let index = index_from_genes(&ann, &[g1], 6);
         let models = vec![
-            m(
-                0,
-                ModelKind::Known(t1),
-                GeneKey::Ref(g1),
-                Strand::Plus,
-                &[(100, 200), (700, 900)],
-            ),
-            m(
-                3,
-                ModelKind::Nic,
-                GeneKey::Ref(g1),
-                Strand::Plus,
-                &[(50, 200), (700, 950)],
-            ),
-            m(
-                5,
-                ModelKind::Nnic,
-                GeneKey::Novel(9),
-                Strand::Minus,
-                &[(2000, 2100), (2300, 2400)],
-            ),
+            m(0, ModelKind::Known(t1), GeneKey::Ref(g1), Strand::Plus, &[(100, 200), (700, 900)]),
+            m(3, ModelKind::Nic, GeneKey::Ref(g1), Strand::Plus, &[(50, 200), (700, 950)]),
+            m(5, ModelKind::Nnic, GeneKey::Novel(9), Strand::Minus, &[(2000, 2100), (2300, 2400)]),
         ];
         let mut c = TxCounter::new();
+        c.add(&FinalAssign { atype: AssignmentType::Unique, gene_atype: AssignmentType::Unique, tx: smallvec![3] }, 1);
+        c.add(&FinalAssign { atype: AssignmentType::Unique, gene_atype: AssignmentType::Unique, tx: smallvec![0] }, 2);
         c.add(
-            &FinalAssign {
-                atype: AssignmentType::Unique,
-                gene_atype: AssignmentType::Unique,
-                tx: smallvec![3],
-            },
-            1,
-        );
-        c.add(
-            &FinalAssign {
-                atype: AssignmentType::Unique,
-                gene_atype: AssignmentType::Unique,
-                tx: smallvec![0],
-            },
-            2,
-        );
-        c.add(
-            &FinalAssign {
-                atype: AssignmentType::Ambiguous,
-                gene_atype: AssignmentType::Unique,
-                tx: smallvec![0, 3],
-            },
+            &FinalAssign { atype: AssignmentType::Ambiguous, gene_atype: AssignmentType::Unique, tx: smallvec![0, 3] },
             1,
         );
         let mut w = ChrPhaseW::new(&ann, "8");
-        let names = with_quirks(QuirkSet::NONE, || {
-            w.add_block(&BlockOutput {
-                index: &index,
-                models: &models,
-                counter: &c,
-            })
-        });
+        let names = w.add_block(&BlockOutput { index: &index, models: &models, counter: &c });
         // forbidden: transcript3 from the annotation
-        assert_eq!(
-            names.tx,
-            ["transcript:T1", "transcript1.8.nic", "transcript2.8.nnic"]
-        );
+        assert_eq!(names.tx, ["transcript:T1", "transcript1.8.nic", "transcript2.8.nnic"]);
         assert_eq!(names.gene, ["gene:G1", "gene:G1", "novel_gene_8_4"]);
         let out = w.finish();
         let want = "8\tens\tgene\t50\t950\t.\t+\t.\tgene_id \"gene:G1\"; transcripts \"2\"; Name \"g1\"; biotype \"pc\"; \n\
 8\tens\ttranscript\t100\t900\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript:T1\"; exons \"2\"; Name \"g1-201\"; \n\
 8\tens\texon\t100\t200\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript:T1\"; exon_number \"1\"; exon_id \"E1\";  Name \"g1-201\"; \n\
-8\tens\tCDS\t150\t200\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript:T1\"; exon_number \"2\"; exon_id \"8.1\"; \n\
+8\tens\tCDS\t150\t200\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript:T1\"; exon_number \"2\"; exon_id \"1\"; \n\
 8\tens\texon\t700\t900\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript:T1\"; exon_number \"3\"; exon_id \"E2\";  Name \"g1-201\"; \n\
 8\tIsoQuant\ttranscript\t50\t950\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript1.8.nic\"; exons \"2\";\n\
-8\tIsoQuant\texon\t50\t200\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript1.8.nic\"; exon_number \"1\"; exon_id \"8.2\"; \n\
-8\tIsoQuant\texon\t700\t950\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript1.8.nic\"; exon_number \"2\"; exon_id \"8.3\"; \n\
+8\tIsoQuant\texon\t50\t200\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript1.8.nic\"; exon_number \"1\"; exon_id \"2\"; \n\
+8\tIsoQuant\texon\t700\t950\t.\t+\t.\tgene_id \"gene:G1\"; transcript_id \"transcript1.8.nic\"; exon_number \"2\"; exon_id \"3\"; \n\
 8\tIsoQuant\tgene\t2000\t2400\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcripts \"1\"; \n\
 8\tIsoQuant\ttranscript\t2000\t2400\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcript_id \"transcript2.8.nnic\"; exons \"2\";\n\
-8\tIsoQuant\texon\t2300\t2400\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcript_id \"transcript2.8.nnic\"; exon_number \"1\"; exon_id \"8.4\"; \n\
-8\tIsoQuant\texon\t2000\t2100\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcript_id \"transcript2.8.nnic\"; exon_number \"2\"; exon_id \"8.5\"; \n";
+8\tIsoQuant\texon\t2300\t2400\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcript_id \"transcript2.8.nnic\"; exon_number \"1\"; exon_id \"4\"; \n\
+8\tIsoQuant\texon\t2000\t2100\t.\t-\t.\tgene_id \"novel_gene_8_4\"; transcript_id \"transcript2.8.nnic\"; exon_number \"2\"; exon_id \"5\"; \n";
         assert_eq!(out.gtf, want);
         let mut pool = GroupPool::new();
         pool.intern("A");
@@ -690,11 +569,7 @@ mod phase_w_tests {
         e.total = 2.0;
         e.in_all = true;
         e.groups.push((1, 2.0));
-        let chrs = [ChrOutput {
-            chr: "8".into(),
-            gtf: "x\n".into(),
-            counts: c,
-        }];
+        let chrs = [ChrOutput { chr: "8".into(), gtf: "x\n".into(), counts: c }];
         let mut pool = GroupPool::new();
         pool.intern("A");
         for gz in [false, true] {
@@ -711,25 +586,20 @@ mod phase_w_tests {
             let read = |p: PathBuf| -> String {
                 let mut s = String::new();
                 if gz {
-                    flate2::read::GzDecoder::new(File::open(p).unwrap())
-                        .read_to_string(&mut s)
-                        .unwrap();
+                    flate2::read::GzDecoder::new(File::open(p).unwrap()).read_to_string(&mut s).unwrap();
                 } else {
                     File::open(p).unwrap().read_to_string(&mut s).unwrap();
                 }
                 s
             };
             assert!(read(spec.gtf_path()).ends_with("# IsoQuant version: v\nx\n"));
-            assert_eq!(read(spec.counts_path()), "feature_id\tcount\ntranscript1.8.nic\t2.00\n__ambiguous\t0\n__no_feature\t0\n__not_aligned\t0\n");
-            let gp = spec.grouped_path().unwrap();
-            assert!(gp
-                .to_str()
-                .unwrap()
-                .contains("OUT.discovered_transcript_grouped_tag_HP_counts.linear.tsv"));
             assert_eq!(
-                read(gp),
-                "feature_id\tgroup_id\tcount\ntranscript1.8.nic\tA\t2.00\n"
+                read(spec.counts_path()),
+                "feature_id\tcount\ntranscript1.8.nic\t2.00\n__ambiguous\t0\n__no_feature\t0\n__not_aligned\t0\n"
             );
+            let gp = spec.grouped_path().unwrap();
+            assert!(gp.to_str().unwrap().contains("OUT.discovered_transcript_grouped_tag_HP_counts.linear.tsv"));
+            assert_eq!(read(gp), "feature_id\tgroup_id\tcount\ntranscript1.8.nic\tA\t2.00\n");
         }
         let _ = std::fs::remove_dir_all(&dir);
     }

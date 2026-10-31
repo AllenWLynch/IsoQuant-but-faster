@@ -1,7 +1,6 @@
 //! `PolyAFinder` (`terminal_prediction/polya_finder.py:19-231`), `PolyAFixer` and
 //! `shift_polya/polyt` (`polya_verification.py:18-115`), and `reconcile_polya` /
-//! `inject_external_polya` (`external_polya.py:119-146`). D-P1 / D-P2 sites use
-//! `iq_types::quirk`.
+//! `inject_external_polya` (`external_polya.py:119-146`).
 //!
 //! The finder never materialises the checked window or its reverse complement. It scans
 //! `seq` in place through an `is_a(i)` predicate: for the polyA tail, `seq[start + i]` is
@@ -9,7 +8,7 @@
 //! 4.1 upper-cases the window, so lower-case bases count too.
 
 use iq_types::read::cigar_decode;
-use iq_types::{quirk, DevId, Iv, PolyAInfo, Pos, RecordLite, Strand};
+use iq_types::{Iv, PolyAInfo, Pos, RecordLite, Strand};
 
 /// Parameters of the finder/fixer (`MatchingParams.polya_window/polya_fraction`,
 /// `max_fake_terminal_exon_len`).
@@ -42,8 +41,8 @@ impl PolyAParams {
 /// `PolyAFinder.find_polya` (`:212-231`) over a virtual sequence of length `n`.
 /// Returns the 0-based start in the virtual sequence.
 ///
-/// D-P1: 4.1's `while i < len(seq) - window` never accepts the final window
-/// (start `n - window`); iqrs tests it.
+/// Matches IsoQuant 4.1: `while i < len(seq) - window` never accepts the final window
+/// (start `n - window`).
 #[inline]
 fn find_polya(n: usize, p: &PolyAParams, is_a: impl Fn(usize) -> bool) -> Option<usize> {
     let w = p.window as usize;
@@ -52,7 +51,7 @@ fn find_polya(n: usize, p: &PolyAParams, is_a: impl Fn(usize) -> bool) -> Option
     }
     let thr = p.threshold();
     // exclusive bound on accepted window starts
-    let limit = if quirk(DevId::P1) { n - w } else { n - w + 1 };
+    let limit = n - w;
     let mut count = (0..w).filter(|&j| is_a(j)).count();
     let mut found = None;
     for i in 0..limit {
@@ -229,11 +228,8 @@ impl Aln<'_> {
         }
         let pos = ce as i64 - pos as i64 - 1;
         let ms = mapped_start as i64;
-        let r = if pos <= ms {
-            self.ref_start - (ms - pos)
-        } else {
-            self.ref_start + move_ref_coord(self.cigar, pos - ms)
-        };
+        let r =
+            if pos <= ms { self.ref_start - (ms - pos) } else { self.ref_start + move_ref_coord(self.cigar, pos - ms) };
         r.max(1) as Pos
     }
 }
@@ -257,10 +253,9 @@ pub fn detect_polya(rec: &RecordLite<'_>, p: &PolyAParams) -> PolyAInfo {
 // PolyAFixer
 // ------------------------------------------------------------------------------------------
 
-/// `count_polya_exons` (`:74-95`). D-P2: 4.1 skips a non-qualifying exon and keeps
-/// counting older ones; iqrs stops at the first non-qualifying exon. On sorted, disjoint
-/// exons (all `get_read_blocks` output) both give the same count: see the
-/// `d_p2_unreachable_on_disjoint_exons` test. The gate is kept so §9 stays checkable.
+/// `count_polya_exons` (`:74-95`). Matches IsoQuant 4.1: a non-qualifying exon is skipped
+/// and older ones keep being counted (on sorted, disjoint exons this is the same as stopping
+/// at the first non-qualifying exon).
 fn count_polya_exons(exons: &[Iv], int_a: Pos, max_fake: i32) -> i32 {
     if int_a == -1 {
         return 0;
@@ -273,14 +268,12 @@ fn count_polya_exons(exons: &[Iv], int_a: Pos, max_fake: i32) -> i32 {
         let len_to = int_a - ex.s;
         if len_to <= 0 || (len_to <= max_fake && ex.e - int_a > 2 * len_to) {
             count += 1;
-        } else if !quirk(DevId::P2) {
-            break;
         }
     }
     count
 }
 
-/// `count_polyt_exons` (`:99-115`), mirror of [`count_polya_exons`] (D-P2).
+/// `count_polyt_exons` (`:99-115`), mirror of [`count_polya_exons`].
 fn count_polyt_exons(exons: &[Iv], int_t: Pos, max_fake: i32) -> i32 {
     if int_t == -1 {
         return 0;
@@ -293,8 +286,6 @@ fn count_polyt_exons(exons: &[Iv], int_t: Pos, max_fake: i32) -> i32 {
         let len_to = ex.e - int_t;
         if len_to <= 0 || (len_to <= max_fake && 2 * len_to < int_t - ex.s) {
             count += 1;
-        } else if !quirk(DevId::P2) {
-            break;
         }
     }
     count
@@ -445,7 +436,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U4ProcessAlignment {
         const UNIT: &'static str = "U4";
         const FN: &'static str = "process_alignment";
-        const DEVIATIONS: &'static [DevId] = &[DevId::P1, DevId::P2];
         type In = U4ProcessAlignmentIn;
         type Out = U4ProcessAlignmentOut;
 
@@ -463,7 +453,11 @@ pub(crate) mod fixture {
             };
             let ext = ExternalPolyA { strand, no_tail: i.external_no_tail };
             let init = crate::cigar::read_blocks(rec.pos0, rec.cigar);
-            let init = U4BlocksFixture { read_exons: init.ref_blocks, read_blocks: init.read_blocks, cigar_blocks: init.cigar_blocks };
+            let init = U4BlocksFixture {
+                read_exons: init.ref_blocks,
+                read_blocks: init.read_blocks,
+                cigar_blocks: init.cigar_blocks,
+            };
             let mut ar = AlignedRead {
                 exons: vec![],
                 read_blocks: vec![],
@@ -494,7 +488,7 @@ pub(crate) fn register_fixtures(reg: &mut iq_types::fixture::Registry) {
 mod tests {
     use super::*;
     use iq_types::read::cigar_encode;
-    use iq_types::{with_quirks, CigarOp, QuirkSet};
+    use iq_types::CigarOp;
 
     const P: PolyAParams = PolyAParams { window: 16, fraction: 0.75, max_fake_terminal_exon_len: 20 };
 
@@ -503,94 +497,44 @@ mod tests {
     }
 
     #[test]
-    fn find_polya_last_window_d_p1() {
-        // C + 16 A: window 0 already has 15 A >= 12, so both builds call it at 1
+    fn find_polya_last_window_matches_41() {
+        // C + 16 A: window 0 already has 15 A >= 12, so it is called at 1
         let s = [&b"C"[..], &[b'A'; 16]].concat();
         assert_eq!(fp(&s), Some(1));
         let mut t = b"CCCCCCCCCCCCCCCCC".to_vec();
         t.extend_from_slice(b"AAAAAAAAAAAA"); // 17 C + 12 A, len 29; first qualifying window starts 13
-        let q41 = with_quirks(QuirkSet::only(DevId::P1), || fp(&t));
-        let iq = with_quirks(QuirkSet::NONE, || fp(&t));
-        assert_eq!(iq, Some(17)); // window 13 accepted, then "AA" at 17
-        if iq_types::QUIRKS41 {
-            assert_eq!(q41, None);
-        }
-        // exact window length: 4.1 never accepts
-        let u = [b'A'; 16];
-        assert_eq!(with_quirks(QuirkSet::NONE, || fp(&u)), Some(0));
-        if iq_types::QUIRKS41 {
-            assert_eq!(with_quirks(QuirkSet::only(DevId::P1), || fp(&u)), None);
-        }
+        assert_eq!(fp(&t), None); // 4.1 never tests the last window
+                                  // exact window length: 4.1 never accepts
+        assert_eq!(fp(&[b'A'; 16]), None);
     }
 
-    /// D-P2 has no reachable effect on sorted, disjoint exons (all `get_read_blocks`
-    /// output): an exon that fails the test has `s < int_a`, so every older exon has
-    /// `e < s < int_a` and 4.1 breaks there anyway. Mirror for polyT.
+    /// End to end: a leading 20-bp polyT exon is trimmed; 4.1 anchors deletions at the
+    /// post-trim first exon.
     #[test]
-    fn d_p2_unreachable_on_disjoint_exons() {
-        let mut x: u64 = 0x9e3779b97f4a7c15;
-        let mut rnd = |m: u64| {
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            (x % m) as i32
-        };
-        for _ in 0..20000 {
-            let n = 1 + rnd(6) as usize;
-            let mut ex = Vec::with_capacity(n);
-            let mut pos = 1 + rnd(50);
-            for _ in 0..n {
-                let s0 = pos + 1 + rnd(40);
-                let e0 = s0 + rnd(60);
-                ex.push(Iv::new(s0, e0));
-                pos = e0 + 1;
-            }
-            let ia = rnd(pos as u64 + 20);
-            let it = rnd(pos as u64 + 20);
-            let cases: [(fn(&[Iv], Pos, i32) -> i32, Pos); 2] = [(count_polya_exons, ia), (count_polyt_exons, it)];
-            for (f, pos) in cases {
-                let a = with_quirks(QuirkSet::only(DevId::P2), || f(&ex, pos, 20));
-                let b = with_quirks(QuirkSet::NONE, || f(&ex, pos, 20));
-                assert_eq!(a, b, "{ex:?} pos={pos}");
-            }
-        }
-    }
-
-    /// End to end: a leading 20-bp polyT exon is trimmed; D-P3 moves the deletion anchor.
-    #[test]
-    fn polyt_trim_and_d_p3_anchor() {
-        let cigar: Vec<u32> = [(CigarOp::M, 20), (CigarOp::N, 100), (CigarOp::M, 10), (CigarOp::D, 2), (CigarOp::M, 60)]
-            .iter()
-            .map(|&(o, l)| cigar_encode(o, l))
-            .collect();
+    fn polyt_trim_and_deletion_anchor() {
+        let cigar: Vec<u32> =
+            [(CigarOp::M, 20), (CigarOp::N, 100), (CigarOp::M, 10), (CigarOp::D, 2), (CigarOp::M, 60)]
+                .iter()
+                .map(|&(o, l)| cigar_encode(o, l))
+                .collect();
         let mut seq = vec![b'T'; 20];
         seq.extend(b"ACGCGTCAGCGCAGCTGACGCGTCAGCGCAGCTGACGCGTCAGCGCAGCTGACGCGTCAGCGCAGCTGACG".iter());
         let rec = iq_types::RecordOwned { qname: "r".into(), flag: 0, pos0: 999, mapq: 60, cigar, seq, tag: None };
-        let run = |q| {
-            with_quirks(q, || {
-                let mut ar = iq_types::AlignedRead {
-                    exons: vec![],
-                    read_blocks: vec![],
-                    cigar_blocks: vec![],
-                    polya: iq_types::NO_POLYA,
-                    exons_changed: false,
-                    deletions: vec![],
-                };
-                assert!(crate::process_alignment_into(&rec.as_lite(), &P, ExternalPolyA::default(), &mut ar));
-                ar
-            })
+        let mut q = iq_types::AlignedRead {
+            exons: vec![],
+            read_blocks: vec![],
+            cigar_blocks: vec![],
+            polya: iq_types::NO_POLYA,
+            exons_changed: false,
+            deletions: vec![],
         };
-        let iq = run(QuirkSet::NONE);
-        assert!(iq.exons_changed);
-        assert_eq!(iq.exons, vec![Iv::new(1120, 1191)]);
-        assert_eq!(iq.cigar_blocks, vec![(2, 4)]);
-        assert_eq!(iq.deletions, vec![(1130, 2)]); // anchored at reference_start + 1
-        if iq_types::QUIRKS41 {
-            let q = run(QuirkSet::only(DevId::P3));
-            // 4.1 walks the full CIGAR from the trimmed exon start: the deletion lands at
-            // 1120 + 20 + 100 + 10 = 1250, more than margin from every boundary, so it is lost
-            assert!(q.deletions.is_empty());
-        }
+        assert!(crate::process_alignment_into(&rec.as_lite(), &P, ExternalPolyA::default(), &mut q));
+        assert!(q.exons_changed);
+        assert_eq!(q.exons, vec![Iv::new(1120, 1191)]);
+        assert_eq!(q.cigar_blocks, vec![(2, 4)]);
+        // 4.1 walks the full CIGAR from the trimmed exon start: the deletion lands at
+        // 1120 + 20 + 100 + 10 = 1250, more than margin from every boundary, so it is lost
+        assert!(q.deletions.is_empty());
     }
 
     #[test]

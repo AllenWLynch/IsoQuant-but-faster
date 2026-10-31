@@ -22,9 +22,7 @@ pub mod output;
 pub use counter::{FeatureCounter, ReadFate, Strategy, TxCounter};
 pub use gtf::{GtfChrWriter, PrintModel};
 pub use ids::{BlockNames, NovelNamer};
-pub use output::{
-    fmt_fixed2, write_outputs, BlockOutput, ChrCounts, ChrOutput, ChrPhaseW, OutputSpec,
-};
+pub use output::{fmt_fixed2, write_outputs, BlockOutput, ChrCounts, ChrOutput, ChrPhaseW, OutputSpec};
 
 /// Registers this crate's fixture runners.
 pub fn register_fixtures(reg: &mut iq_types::fixture::Registry) {

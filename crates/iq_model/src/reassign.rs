@@ -80,7 +80,13 @@ enum Plan {
 /// [`assign_reads`] against a prebuilt `index` (= `from_models(ms.models)`; unused when
 /// there are no models). Parallel above `par_threshold` reads to profile per chunk
 /// (`0` = always, `usize::MAX` = never); the result does not depend on it.
-pub fn assign_reads_with_index(ms: &mut ModelStore, ctx: &Ctx<'_>, reads: &[ReadIdx], index: &IsoformIndex, par_threshold: usize) {
+pub fn assign_reads_with_index(
+    ms: &mut ModelStore,
+    ctx: &Ctx<'_>,
+    reads: &[ReadIdx],
+    index: &IsoformIndex,
+    par_threshold: usize,
+) {
     if ms.models.is_empty() {
         for &r in reads {
             ms.read_assignment_counts[r as usize] = 0;
@@ -276,14 +282,13 @@ pub(crate) mod fixture {
     use iq_assign::AssignParams;
     use iq_types::fixture::schema::{StageStoreIn, StoreOut};
     use iq_types::fixture::{FixError, FixResult, FixtureCtx, UnitFixture, Verdict};
-    use iq_types::{DevId, Predictions};
+    use iq_types::Predictions;
 
     pub struct U17Assign;
 
     impl UnitFixture for U17Assign {
         const UNIT: &'static str = "U17";
         const FN: &'static str = "assign_reads_to_models";
-        const DEVIATIONS: &'static [DevId] = &[DevId::M5];
         type In = StageStoreIn;
         type Out = StoreOut;
 
@@ -330,7 +335,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U17Resolve {
         const UNIT: &'static str = "U17";
         const FN: &'static str = "resolve_read_ownership_conflicts";
-        const DEVIATIONS: &'static [DevId] = &[DevId::M5];
         type In = StageStoreIn;
         type Out = StoreOut;
 

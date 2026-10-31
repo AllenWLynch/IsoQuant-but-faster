@@ -31,8 +31,8 @@ use iq_assign::assigner::{assign_with, AssignScratch};
 use iq_assign::profile::{ProfileBuilder, Scratch};
 use iq_assign::AssignParams;
 use iq_types::{
-    vertex_code, Assignment, AssignmentType, CombinedProfile, EventType, GeneKey, IsoRef, IsoformIndex, Iv,
-    ModelKind, ModelStore, Pos, RefSlice, Strand, StrandnessReporting, TranscriptModel, TxIdx, Vertex, NO_POLYA,
+    vertex_code, Assignment, AssignmentType, CombinedProfile, EventType, GeneKey, IsoRef, IsoformIndex, Iv, ModelKind,
+    ModelStore, Pos, RefSlice, Strand, StrandnessReporting, TranscriptModel, TxIdx, Vertex, NO_POLYA,
 };
 use rayon::prelude::*;
 use std::cell::RefCell;
@@ -61,7 +61,13 @@ pub struct LiveAssigner {
 }
 
 impl ReadAssigner for LiveAssigner {
-    fn assign(&self, index: &IsoformIndex, profile: &CombinedProfile, quick_mode: bool, _read_key: u64) -> Option<Assignment> {
+    fn assign(
+        &self,
+        index: &IsoformIndex,
+        profile: &CombinedProfile,
+        quick_mode: bool,
+        _read_key: u64,
+    ) -> Option<Assignment> {
         thread_local! {
             static SCRATCH: RefCell<AssignScratch> = RefCell::new(AssignScratch::default());
         }
@@ -299,7 +305,13 @@ fn decide(ctx: &Ctx<'_>, path: &[Vertex], assignment: Option<&Assignment>) -> De
 }
 
 /// `select_reference_gene` (`context.py:186-200`).
-fn select_reference_gene(ctx: &Ctx<'_>, aux: &FlAux<'_>, tables: &Tables<'_>, introns: &[Vertex], strand: Strand) -> Option<GeneKey> {
+fn select_reference_gene(
+    ctx: &Ctx<'_>,
+    aux: &FlAux<'_>,
+    tables: &Tables<'_>,
+    introns: &[Vertex],
+    strand: Strand,
+) -> Option<GeneKey> {
     let index = ctx.index;
     if index.exons.is_empty() {
         return None;
@@ -352,7 +364,9 @@ fn novel_model(
     let (fwd, rev) = tables.strands.count_canonical_sites(introns.iter().map(intron_of));
     let mut strand = majority_strand(fwd, rev, has_polya, has_polyt);
     let clean = clean_strand(fwd, rev);
-    if exons.len() == 2 && ((p.model.require_monointronic_polya && !(has_polya || has_polyt)) || clean == Strand::Unknown) {
+    if exons.len() == 2
+        && ((p.model.require_monointronic_polya && !(has_polya || has_polyt)) || clean == Strand::Unknown)
+    {
         return None;
     }
     if (p.report_canonical == StrandnessReporting::OnlyCanonical && clean == Strand::Unknown)
@@ -510,7 +524,7 @@ pub(crate) mod fixture {
     use crate::fixture_util::{compare_stores, StageInput};
     use iq_types::fixture::schema::{StageStoreIn, StoreOut};
     use iq_types::fixture::{FixError, FixResult, FixtureCtx, UnitFixture, Verdict};
-    use iq_types::{DevId, Predictions};
+    use iq_types::Predictions;
     use std::io::{Read, Seek, SeekFrom};
     use std::path::PathBuf;
 
@@ -562,7 +576,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U13Fl {
         const UNIT: &'static str = "U13";
         const FN: &'static str = "construct_fl_isoforms";
-        const DEVIATIONS: &'static [DevId] = &[DevId::M1];
         type In = StageStoreIn;
         type Out = StoreOut;
 

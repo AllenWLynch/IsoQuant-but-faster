@@ -18,11 +18,10 @@
 //!   eligible models in parallel (rayon) before the sequential dedup/read-moving pass. That
 //!   is exact: a source's read list is only changed by moves onto its own NICs, after its
 //!   own derivation (storage with a repeated model key falls back to the sequential order).
-//! - **D-E1 (mono-exon end overwrite, dropped):** 4.1 `correct_novel_transcript_ends`
+//! - **Mono-exon end overwrite (matches IsoQuant 4.1):** `correct_novel_transcript_ends`
 //!   captures `last_exon_left` before editing; for a one-exon model whose start *and* end are
 //!   both corrected, the end edit writes `(old_start, new_end)` and undoes the start
 //!   correction (regression from the 4.1 refactor fe84ccdc; the 2021 original read it live).
-//!   iqrs reads the last exon start live (clamp and write); `quirk(D-E1)` restores 4.1.
 //! - `source_known` of a derived NIC stays `None` (4.1 models have no such field and the
 //!   fixture conversion never sets it).
 
@@ -30,7 +29,9 @@ use crate::ctx::Ctx;
 use crate::filter::EndProcessor;
 use iq_terminal::peaks::{detect_peaks_ties, Histogram, Ties};
 use iq_terminal::{bundled_models, XgbModel};
-use iq_types::{junctions_from_blocks, quirk, DevId, Iv, ModelIdx, ModelKind, ModelStore, Peak, Pos, ReadIdx, Strand, TranscriptModel};
+use iq_types::{
+    junctions_from_blocks, Iv, ModelIdx, ModelKind, ModelStore, Peak, Pos, ReadIdx, Strand, TranscriptModel,
+};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -255,12 +256,11 @@ impl Ends {
                 None => eh.keys().copied().filter(|&p| p < te).max(),
             };
             if let Some(ne) = new {
-                // D-E1: 4.1 uses `last_exon_left` captured before the start edit, so a
-                // mono-exon model loses its start correction; iqrs reads it live (as the
-                // 2021 original, 0bd9b1e2). Identical for multi-exon models.
-                let lel_now = if quirk(DevId::E1) { lel } else { model.exons[last].s };
-                if ne != te && ne > lel_now {
-                    model.exons[last] = Iv::new(lel_now, ne);
+                // Matches IsoQuant 4.1: `last_exon_left` was captured before the start edit,
+                // so a mono-exon model loses its start correction. Identical for multi-exon
+                // models.
+                if ne != te && ne > lel {
+                    model.exons[last] = Iv::new(lel, ne);
                 }
             }
         }
@@ -310,45 +310,47 @@ impl Ends {
         // end (ties → smaller coordinate); reads go to an alt peak within apa_delta, once.
         // Peak positions are distinct (find_peaks locations), so a slot index stands for
         // 4.1's position-keyed `per_peak` dict.
-        let mut side = |entries: &[(Pos, ReadIdx)], peaks: &[Pos], annotated: Pos, start_side: bool, out: &mut Vec<AltEnd>| {
-            if peaks.is_empty() {
-                return;
-            }
-            let mut per_peak: Vec<Vec<ReadIdx>> = vec![Vec::new(); peaks.len()];
-            let hist = histogram(entries);
-            let mut order: Vec<(usize, ReadIdx)> = entries.iter().map(|&(p, r)| (hist.get_index_of(&p).unwrap(), r)).collect();
-            order.sort_by_key(|x| x.0); // stable: read order within a position
-            let mut k = 0;
-            for (pi, &p) in hist.keys().enumerate() {
-                let k0 = k;
-                while k < order.len() && order[k].0 == pi {
-                    k += 1;
+        let mut side =
+            |entries: &[(Pos, ReadIdx)], peaks: &[Pos], annotated: Pos, start_side: bool, out: &mut Vec<AltEnd>| {
+                if peaks.is_empty() {
+                    return;
                 }
-                let dist = |c: Pos| (c as i64 - p as i64).abs();
-                let mut best = (dist(annotated), annotated);
-                let mut slot = None;
-                for (i, &c) in peaks.iter().enumerate() {
-                    if (dist(c), c) < best {
-                        best = (dist(c), c);
-                        slot = Some(i);
+                let mut per_peak: Vec<Vec<ReadIdx>> = vec![Vec::new(); peaks.len()];
+                let hist = histogram(entries);
+                let mut order: Vec<(usize, ReadIdx)> =
+                    entries.iter().map(|&(p, r)| (hist.get_index_of(&p).unwrap(), r)).collect();
+                order.sort_by_key(|x| x.0); // stable: read order within a position
+                let mut k = 0;
+                for (pi, &p) in hist.keys().enumerate() {
+                    let k0 = k;
+                    while k < order.len() && order[k].0 == pi {
+                        k += 1;
                     }
-                }
-                if let Some(i) = slot.filter(|_| best.0 <= d as i64) {
-                    for &(_, r) in &order[k0..k] {
-                        if claimed.insert(r) {
-                            per_peak[i].push(r);
+                    let dist = |c: Pos| (c as i64 - p as i64).abs();
+                    let mut best = (dist(annotated), annotated);
+                    let mut slot = None;
+                    for (i, &c) in peaks.iter().enumerate() {
+                        if (dist(c), c) < best {
+                            best = (dist(c), c);
+                            slot = Some(i);
+                        }
+                    }
+                    if let Some(i) = slot.filter(|_| best.0 <= d as i64) {
+                        for &(_, r) in &order[k0..k] {
+                            if claimed.insert(r) {
+                                per_peak[i].push(r);
+                            }
                         }
                     }
                 }
-            }
-            for (&pos, reads) in peaks.iter().zip(per_peak) {
-                out.push(if start_side {
-                    AltEnd { start: Some(pos), end: None, reads }
-                } else {
-                    AltEnd { start: None, end: Some(pos), reads }
-                });
-            }
-        };
+                for (&pos, reads) in peaks.iter().zip(per_peak) {
+                    out.push(if start_side {
+                        AltEnd { start: Some(pos), end: None, reads }
+                    } else {
+                        AltEnd { start: None, end: Some(pos), reads }
+                    });
+                }
+            };
         if let Some(m) = sm {
             let peaks = self.alternative_end_positions(&histogram(&t.start), m, ann_start, |p| p < fer, ctx);
             side(&t.start, &peaks, ann_start, true, &mut out);
@@ -513,10 +515,12 @@ pub(crate) mod fixture {
     use crate::ctx::ReadAssigner;
     use crate::fixture_util::{compare_stores, StageInput};
     use iq_types::fixture::convert::ModelExtras;
-    use iq_types::fixture::schema::{ModelFixture, ModelOut, StageModelIn, StageStoreIn, StoreOut, U15bDeriveAltEndOut};
+    use iq_types::fixture::schema::{
+        ModelFixture, ModelOut, StageModelIn, StageStoreIn, StoreOut, U15bDeriveAltEndOut,
+    };
     use iq_types::fixture::{FixResult, FixtureCtx, UnitFixture, Verdict};
     use iq_types::{
-        Assignment, CombinedProfile, DevId, IntronGraph, IsoformIndex, PathStorage, Predictions, TranscriptModelType,
+        Assignment, CombinedProfile, IntronGraph, IsoformIndex, PathStorage, Predictions, TranscriptModelType,
     };
 
     /// End processing never assigns reads.
@@ -527,48 +531,40 @@ pub(crate) mod fixture {
         }
     }
 
-    /// `UnitFixture::judge` (parity = all quirks; default = none, then one DevId of `devs` at
-    /// a time) with a D-T1 fallback: a mismatch that the reverse peak tie order reproduces
-    /// exactly is `Explained(D-T1)`.
+    /// `UnitFixture::judge` with a D-T1 fallback: a mismatch that the reverse peak tie order
+    /// reproduces exactly is `Explained("D-T1")`.
     pub(crate) fn judge_ties<I, O>(
         run: impl Fn(&I, &FixtureCtx, Ends) -> FixResult<O>,
         compare: impl Fn(&O, &O, &FixtureCtx) -> Verdict,
-        devs: &[DevId],
         input: &I,
         want: &O,
         ctx: &FixtureCtx,
     ) -> Verdict {
         use iq_types::fixture::diff::Diff;
-        use iq_types::fixture::RunMode;
-        use iq_types::{with_quirks, QuirkSet};
         use std::panic::{catch_unwind, AssertUnwindSafe};
-        let attempt = |set: QuirkSet, e: Ends| match catch_unwind(AssertUnwindSafe(|| with_quirks(set, || run(input, ctx, e)))) {
+        let attempt = |e: Ends| match catch_unwind(AssertUnwindSafe(|| run(input, ctx, e))) {
             Ok(Ok(got)) => compare(&got, want, ctx),
             Ok(Err(err)) => Verdict::Mismatch(Diff::error(format!("run failed: {err}"))),
             Err(_) => Verdict::Mismatch(Diff::error("panic")),
         };
         let reverse = Ends { ties: Ties::PositionDesc };
-        let base = if ctx.mode == RunMode::Parity { QuirkSet::all() } else { QuirkSet::NONE };
-        let v = attempt(base, Ends::default());
+        let v = attempt(Ends::default());
         if v.is_ok() {
             return v;
         }
         // fixtures come from a SIMD CPU, where large tied peak arrays may sort differently
-        if attempt(base, reverse) == Verdict::Exact || attempt(base, Ends { ties: Ties::PositionAsc }) == Verdict::Exact {
-            return Verdict::Explained(DevId::T1);
-        }
-        if ctx.mode == RunMode::Default && iq_types::QUIRKS41 {
-            for &d in devs.iter().filter(|&&d| d != DevId::T1) {
-                if attempt(QuirkSet::only(d), Ends::default()) == Verdict::Exact {
-                    return Verdict::Explained(d);
-                }
-            }
+        if attempt(reverse) == Verdict::Exact || attempt(Ends { ties: Ties::PositionAsc }) == Verdict::Exact {
+            return Verdict::Explained("D-T1");
         }
         v
     }
 
     /// Per-model case: converted model + its extras, block, index, params.
-    fn model_case<R>(input: &StageModelIn, ctx: &FixtureCtx, f: impl FnOnce(TranscriptModel, ModelExtras, &mut iq_types::fixture::ids::IdMaps, &Ctx<'_>) -> R) -> FixResult<R> {
+    fn model_case<R>(
+        input: &StageModelIn,
+        ctx: &FixtureCtx,
+        f: impl FnOnce(TranscriptModel, ModelExtras, &mut iq_types::fixture::ids::IdMaps, &Ctx<'_>) -> R,
+    ) -> FixResult<R> {
         let params = ctx.params()?;
         let block = ctx.block(&input.block)?;
         let index = ctx.index(&input.index)?;
@@ -615,14 +611,13 @@ pub(crate) mod fixture {
     impl UnitFixture for U15bCorrectEnds {
         const UNIT: &'static str = "U15b";
         const FN: &'static str = "correct_novel_transcript_ends";
-        const DEVIATIONS: &'static [DevId] = &[DevId::T1, DevId::E1];
         type In = StageModelIn;
         type Out = ModelOut;
         fn run(input: &StageModelIn, ctx: &FixtureCtx) -> FixResult<ModelOut> {
             run_model(input, ctx, Ends::default(), false)
         }
         fn judge(input: &StageModelIn, want: &ModelOut, ctx: &FixtureCtx) -> Verdict {
-            judge_ties(|i, c, e| run_model(i, c, e, false), default_compare, Self::DEVIATIONS, input, want, ctx)
+            judge_ties(|i, c, e| run_model(i, c, e, false), default_compare, input, want, ctx)
         }
     }
 
@@ -649,7 +644,8 @@ pub(crate) mod fixture {
                 .map(|(i, (nic, reads))| {
                     // 4.1 id: `transcript<get_transcript_id()>.<chr>.<nic|nnic>` (D-M1: iqrs
                     // keys stand in for these ids; the name is rebuilt here for comparison)
-                    let suffix = if nic.kind.model_type() == TranscriptModelType::NovelInCatalog { "nic" } else { "nnic" };
+                    let suffix =
+                        if nic.kind.model_type() == TranscriptModelType::NovelInCatalog { "nic" } else { "nnic" };
                     let name = format!("transcript{}.{chr}.{suffix}", counter + 1 + i as i64);
                     let k = ids.models.intern(&name);
                     debug_assert_eq!(k, nic.key);
@@ -665,14 +661,13 @@ pub(crate) mod fixture {
     impl UnitFixture for U15bDerive {
         const UNIT: &'static str = "U15b";
         const FN: &'static str = "derive_alternative_end_models";
-        const DEVIATIONS: &'static [DevId] = &[DevId::T1];
         type In = StageModelIn;
         type Out = U15bDeriveAltEndOut;
         fn run(input: &StageModelIn, ctx: &FixtureCtx) -> FixResult<U15bDeriveAltEndOut> {
             run_derive(input, ctx, Ends::default())
         }
         fn judge(input: &StageModelIn, want: &U15bDeriveAltEndOut, ctx: &FixtureCtx) -> Verdict {
-            judge_ties(run_derive, default_compare, Self::DEVIATIONS, input, want, ctx)
+            judge_ties(run_derive, default_compare, input, want, ctx)
         }
     }
 
@@ -705,7 +700,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U15bAddKnown {
         const UNIT: &'static str = "U15b";
         const FN: &'static str = "_add_known_alternative_end_models";
-        const DEVIATIONS: &'static [DevId] = &[DevId::T1];
         type In = StageStoreIn;
         type Out = StoreOut;
         fn run(input: &StageStoreIn, ctx: &FixtureCtx) -> FixResult<StoreOut> {
@@ -715,7 +709,7 @@ pub(crate) mod fixture {
             store_compare(got, want, ctx)
         }
         fn judge(input: &StageStoreIn, want: &StoreOut, ctx: &FixtureCtx) -> Verdict {
-            judge_ties(run_store, store_compare, Self::DEVIATIONS, input, want, ctx)
+            judge_ties(run_store, store_compare, input, want, ctx)
         }
     }
 
@@ -738,7 +732,10 @@ pub(crate) mod fixture {
 mod tests {
     use super::fixture::NoAssign;
     use super::*;
-    use iq_types::{Assignment, AssignmentType, BlockStore, GeneKey, IntronGraph, IsoformIndex, Params, PathStorage, PolyAInfo, Predictions, ReadRecord, NO_POLYA};
+    use iq_types::{
+        Assignment, AssignmentType, BlockStore, GeneKey, IntronGraph, IsoformIndex, Params, PathStorage, PolyAInfo,
+        Predictions, ReadRecord, NO_POLYA,
+    };
 
     #[test]
     fn batched_moves_match_sequential_list_remove() {
@@ -766,8 +763,15 @@ mod tests {
                 }
                 let mut b = mk();
                 move_reads_batched(&mut b, &alt, 0, 8);
-                assert_eq!(a.transcript_read_ids.iter().collect::<Vec<_>>(), b.transcript_read_ids.iter().collect::<Vec<_>>(), "alt {alt:?} keep {keep}");
-                assert_eq!(a.internal_counter.iter().collect::<Vec<_>>(), b.internal_counter.iter().collect::<Vec<_>>());
+                assert_eq!(
+                    a.transcript_read_ids.iter().collect::<Vec<_>>(),
+                    b.transcript_read_ids.iter().collect::<Vec<_>>(),
+                    "alt {alt:?} keep {keep}"
+                );
+                assert_eq!(
+                    a.internal_counter.iter().collect::<Vec<_>>(),
+                    b.internal_counter.iter().collect::<Vec<_>>()
+                );
                 assert_eq!(a.read_assignment_counts, b.read_assignment_counts);
                 assert_eq!(a.construction_assignment, b.construction_assignment);
             }
@@ -815,7 +819,15 @@ mod tests {
         let graph = IntronGraph::default();
         let paths = PathStorage::default();
         let preds = Predictions::default();
-        let c = Ctx { params: &params, index: &index, store: &store, graph: &graph, paths: &paths, predictions: &preds, assigner: &NoAssign };
+        let c = Ctx {
+            params: &params,
+            index: &index,
+            store: &store,
+            graph: &graph,
+            paths: &paths,
+            predictions: &preds,
+            assigner: &NoAssign,
+        };
         f(&c)
     }
 
@@ -857,21 +869,14 @@ mod tests {
     }
 
     #[test]
-    fn mono_exon_end_edit_d_e1() {
+    fn mono_exon_end_edit_matches_41() {
         // unstranded → positional fallback on both sides
         let reads = [read(0, 1100, 1800, NO_POLYA)];
         with_ctx(&reads, false, |c| {
-            let run = |set: iq_types::QuirkSet| {
-                let mut m = model(0, ModelKind::Nnic, Strand::Unknown, &[(1000, 2000)]);
-                iq_types::with_quirks(set, || Ends::default().correct_ends(&mut m, &[0], c));
-                m.exons
-            };
-            // iqrs: both corrections kept
-            assert_eq!(run(iq_types::QuirkSet::NONE), vec![Iv::new(1100, 1800)]);
-            if iq_types::QUIRKS41 {
-                // 4.1: the end edit restores the old start
-                assert_eq!(run(iq_types::QuirkSet::only(DevId::E1)), vec![Iv::new(1000, 1800)]);
-            }
+            let mut m = model(0, ModelKind::Nnic, Strand::Unknown, &[(1000, 2000)]);
+            Ends::default().correct_ends(&mut m, &[0], c);
+            // 4.1: the end edit restores the old start
+            assert_eq!(m.exons, vec![Iv::new(1000, 1800)]);
         });
     }
 
@@ -897,7 +902,7 @@ mod tests {
 
     /// Integration: U15a `filter_transcripts` fixtures with the live [`Ends`] instead of the
     /// replay stub. `IQRS_FIXTURES` (default `../fixtures` next to the workspace).
-    /// `cargo test -p iq_model --release --features quirks41 -- --ignored filter_with_live_ends --nocapture`
+    /// `cargo test -p iq_model --release -- --ignored filter_with_live_ends --nocapture`
     #[test]
     #[ignore]
     fn filter_with_live_ends() {
@@ -906,7 +911,9 @@ mod tests {
         use crate::fl::LiveAssigner;
         use iq_assign::AssignParams;
         use iq_types::fixture::schema::{StageStoreIn, StoreOut};
-        use iq_types::fixture::{fixtures_root, run_path, FixResult, FixtureCtx, Registry, RunMode, Summary, UnitFixture, Verdict};
+        use iq_types::fixture::{
+            fixtures_root, run_path, FixResult, FixtureCtx, Registry, Summary, UnitFixture, Verdict,
+        };
 
         struct LiveFilter;
         impl UnitFixture for LiveFilter {
@@ -918,7 +925,9 @@ mod tests {
                 let si = StageInput::load(input, ctx)?;
                 let mut ms = si.store.clone();
                 let preds = Predictions::default();
-                let assigner = LiveAssigner { params: AssignParams::new(si.params.matching.clone(), si.params.splice.clone(), false) };
+                let assigner = LiveAssigner {
+                    params: AssignParams::new(si.params.matching.clone(), si.params.splice.clone(), false),
+                };
                 let c = Ctx {
                     params: &si.params,
                     index: &si.index,
@@ -936,12 +945,12 @@ mod tests {
             }
         }
 
-        let root = fixtures_root().unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures"));
+        let root = fixtures_root()
+            .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures"));
         let mut reg = Registry::new();
         reg.add::<LiveFilter>();
-        let mode = if iq_types::QUIRKS41 { RunMode::Parity } else { RunMode::Default };
         let mut summary = Summary::new(3);
-        run_path(&reg, "U15a", &root, mode, &mut summary).unwrap();
+        run_path(&reg, "U15a", &root, &mut summary).unwrap();
         print!("{summary}");
         let t = &summary.by_key[&("U15a".to_owned(), "filter_transcripts".to_owned())];
         assert!(t.exact > 0);
@@ -949,22 +958,19 @@ mod tests {
     }
 
     /// U15b fixtures through this crate's registry (independent of the `iqrs-fixture`
-    /// binary), parity and default mode.
-    /// `cargo test -p iq_model --release --features quirks41 -- --ignored u15b_fixtures --nocapture`
+    /// binary).
+    /// `cargo test -p iq_model --release -- --ignored u15b_fixtures --nocapture`
     #[test]
     #[ignore]
     fn u15b_fixtures() {
-        use iq_types::fixture::{fixtures_root, run_path, Registry, RunMode, Summary};
-        let root = fixtures_root().unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures"));
+        use iq_types::fixture::{fixtures_root, run_path, Registry, Summary};
+        let root = fixtures_root()
+            .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures"));
         let mut reg = Registry::new();
         crate::register_fixtures(&mut reg);
-        let modes: &[RunMode] = if iq_types::QUIRKS41 { &[RunMode::Parity, RunMode::Default] } else { &[RunMode::Default] };
-        for &mode in modes {
-            let mut summary = Summary::new(3);
-            run_path(&reg, "U15b", &root, mode, &mut summary).unwrap();
-            println!("mode {mode:?}");
-            print!("{summary}");
-            assert!(summary.by_key.values().all(|t| t.mismatch == 0 && t.decode_error == 0 && t.exact > 0));
-        }
+        let mut summary = Summary::new(3);
+        run_path(&reg, "U15b", &root, &mut summary).unwrap();
+        print!("{summary}");
+        assert!(summary.by_key.values().all(|t| t.mismatch == 0 && t.decode_error == 0 && t.exact > 0));
     }
 }

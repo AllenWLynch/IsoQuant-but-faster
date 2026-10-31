@@ -93,8 +93,8 @@ pub struct Ctx<'a> {
     pub cats: Vec<String>,
     /// Per global model: structural class (with annotation).
     pub sclass: Option<Vec<u8>>,
-    /// Default-mode run: D-A1 categories are excluded from gated metrics.
-    pub default_mode: bool,
+    /// `--exclude-nongene-loci`: non-`gene` locus categories are excluded from gated metrics.
+    pub exclude_nongene: bool,
     pub top: usize,
 }
 
@@ -131,7 +131,7 @@ impl<'a> Ctx<'a> {
     pub fn matched(&self, g: usize) -> bool {
         self.mt.comps[self.mt.comp_of[g] as usize].matched()
     }
-    pub fn is_da1(&self, g: usize) -> bool {
+    pub fn is_nongene(&self, g: usize) -> bool {
         match &self.cat {
             Some(c) => {
                 let n = &self.cats[c[g] as usize];
@@ -140,9 +140,9 @@ impl<'a> Ctx<'a> {
             None => false,
         }
     }
-    /// Models that enter gated metrics (all, or non-D-A1 loci in default mode).
+    /// Models that enter gated metrics (all, or only `gene`/intergenic loci with `--exclude-nongene-loci`).
     pub fn gated(&self, g: usize) -> bool {
-        !(self.default_mode && self.is_da1(g))
+        !(self.exclude_nongene && self.is_nongene(g))
     }
     fn cat_name(&self, g: usize) -> &str {
         match &self.cat {
@@ -193,7 +193,9 @@ pub fn overview(c: &Ctx, rep: &mut Report) {
     t.row(row("__no_feature", &|s| cnt(c.side(s).stats.no_feature)));
     t.row(row("__not_aligned", &|s| cnt(c.side(s).stats.not_aligned)));
     t.row(row("grouped files", &|s| c.side(s).grouped.len().to_string()));
-    t.row(row("per-read file", &|s| c.side(s).reads.as_ref().map(|r| r.path.display().to_string()).unwrap_or_else(|| "-".into())));
+    t.row(row("per-read file", &|s| {
+        c.side(s).reads.as_ref().map(|r| r.path.display().to_string()).unwrap_or_else(|| "-".into())
+    }));
     rep.tables.push(t);
     let units = c.mt.comps.iter().filter(|u| u.matched()).count();
     for s in 0..2 {
@@ -212,7 +214,7 @@ pub fn chain(c: &Ctx, rep: &mut Report) {
     let dir = ["ref_to_test", "test_to_ref"];
     for s in 0..2 {
         let (w, u, ..) = c.frac(s, |g| c.gated(g));
-        let note = if c.default_mode { " Default mode: models at D-A1 loci (gene type != gene) excluded." } else { "" };
+        let note = if c.exclude_nongene { " Models at non-`gene` loci excluded." } else { "" };
         rep.metrics.push(Metric::new(format!("chain_match_{}", dir[s]), "chain", "frac", w, 1.0 - w).thr(0.01).desc(format!(
             "sum of counts of {} models whose structure (multi-exon: chr+strand+exact intron chain; mono-exon: same strand, reciprocal overlap >= 0.8) exists on the other side / sum of all {} counts.{note}",
             SIDES[s], SIDES[s]
@@ -223,11 +225,20 @@ pub fn chain(c: &Ctx, rep: &mut Report) {
         );
         let (wm, ..) = c.frac(s, |g| c.gated(g) && c.model(g).exons.len() > 1);
         let (wo, ..) = c.frac(s, |g| c.gated(g) && c.model(g).is_mono());
-        rep.metrics.push(Metric::new(format!("chain_match_{}_multi", dir[s]), "chain", "frac", wm, 1.0 - wm).desc("read-weighted, multi-exon models only"));
-        rep.metrics.push(Metric::new(format!("chain_match_{}_mono", dir[s]), "chain", "frac", wo, 1.0 - wo).desc("read-weighted, mono-exon models only"));
-        if c.default_mode && c.cat.is_some() {
+        rep.metrics.push(
+            Metric::new(format!("chain_match_{}_multi", dir[s]), "chain", "frac", wm, 1.0 - wm)
+                .desc("read-weighted, multi-exon models only"),
+        );
+        rep.metrics.push(
+            Metric::new(format!("chain_match_{}_mono", dir[s]), "chain", "frac", wo, 1.0 - wo)
+                .desc("read-weighted, mono-exon models only"),
+        );
+        if c.exclude_nongene && c.cat.is_some() {
             let (wa, ..) = c.frac(s, |_| true);
-            rep.metrics.push(Metric::new(format!("chain_match_{}_all_loci", dir[s]), "chain", "frac", wa, 1.0 - wa).desc("read-weighted, including D-A1 loci (not gated)"));
+            rep.metrics.push(
+                Metric::new(format!("chain_match_{}_all_loci", dir[s]), "chain", "frac", wa, 1.0 - wa)
+                    .desc("read-weighted, including non-`gene` loci (not gated)"),
+            );
         }
     }
 }
@@ -255,8 +266,14 @@ pub fn counts(c: &Ctx, rep: &mut Report) {
         "Spearman (average ranks) of (sum ref count, sum test count) over the {} matched units",
         x.len()
     )));
-    rep.metrics.push(Metric::new("pearson_log1p_matched", "counts", "corr", pl, 1.0 - pl).desc("Pearson of log1p counts over matched units"));
-    rep.metrics.push(Metric::new("count_concordance_matched", "counts", "frac", conc, 1.0 - conc).desc("sum_u min(ref,test) / sum_u max(ref,test) over matched units"));
+    rep.metrics.push(
+        Metric::new("pearson_log1p_matched", "counts", "corr", pl, 1.0 - pl)
+            .desc("Pearson of log1p counts over matched units"),
+    );
+    rep.metrics.push(
+        Metric::new("count_concordance_matched", "counts", "frac", conc, 1.0 - conc)
+            .desc("sum_u min(ref,test) / sum_u max(ref,test) over matched units"),
+    );
 }
 
 pub fn fates(c: &Ctx, rep: &mut Report) {
@@ -279,7 +296,8 @@ pub fn fates(c: &Ctx, rep: &mut Report) {
         rep.metrics.push(m);
     }
     // per-read files
-    let mut ft_tab = Table::new("fates", "Per-read fine fates (reads)", &["fate", "ref", "test", "ref frac", "test frac"]);
+    let mut ft_tab =
+        Table::new("fates", "Per-read fine fates (reads)", &["fate", "ref", "test", "ref frac", "test frac"]);
     let mut fine = [[0u64; 10]; 2];
     let mut ntot = [0u64; 2];
     for s in 0..2 {
@@ -375,11 +393,16 @@ pub fn fates(c: &Ctx, rep: &mut Report) {
     let diag: u64 = (0..6).map(|i| conf[i][i]).sum();
     let all: u64 = conf.iter().flatten().sum();
     let agree = pct(diag as f64, all as f64);
-    rep.metrics.push(Metric::new("fate_read_agreement", "fates", "frac", agree, 1.0 - agree).desc("fraction of reads (union of both files) with the same coarse fate on both sides"));
+    rep.metrics.push(
+        Metric::new("fate_read_agreement", "fates", "frac", agree, 1.0 - agree)
+            .desc("fraction of reads (union of both files) with the same coarse fate on both sides"),
+    );
     let ma = pct(uu_same as f64, uu as f64);
-    rep.metrics.push(Metric::new("read_model_agreement", "fates", "frac", ma, 1.0 - ma).desc(
-        "among reads unique on both sides, fraction assigned to structurally matched models (same match unit)",
-    ));
+    rep.metrics.push(
+        Metric::new("read_model_agreement", "fates", "frac", ma, 1.0 - ma).desc(
+            "among reads unique on both sides, fraction assigned to structurally matched models (same match unit)",
+        ),
+    );
     let mut t = Table::new("fates", "Per-read file notes", &["", "ref", "test"]);
     t.row(vec!["rows".into(), rr.n_rows.to_string(), tr.n_rows.to_string()]);
     t.row(vec!["reads".into(), rr.recs.len().to_string(), tr.recs.len().to_string()]);
@@ -455,7 +478,8 @@ pub fn tpg(c: &Ctx, rep: &mut Report) {
     ];
     for k in 0..2 {
         let d = pct(res[k][1] - res[k][0], res[k][0]);
-        rep.metrics.push(Metric::new(names[k], "tpg", "rel", d, d.abs()).sides(res[k][0], res[k][1]).thr(0.01).desc(descs[k]));
+        rep.metrics
+            .push(Metric::new(names[k], "tpg", "rel", d, d.abs()).sides(res[k][0], res[k][1]).thr(0.01).desc(descs[k]));
     }
     let mut t = Table::new("tpg", "Models per gene / locus", &["grouping", "side", "groups", "1", "2", "3-5", "6+"]);
     for (k, kn) in ["gene_id", "locus"].iter().enumerate() {
@@ -477,7 +501,11 @@ pub fn novelty(c: &Ctx, rep: &mut Report) {
         views.push(("struct", &STRUCT_CLASSES, sc.as_slice(), true));
     }
     views.push(("label", &LABEL_CLASSES, label.as_slice(), !has_s));
-    let mut t = Table::new("novelty", "Model classes", &["view", "class", "ref models", "test models", "ref reads", "test reads"]);
+    let mut t = Table::new(
+        "novelty",
+        "Model classes",
+        &["view", "class", "ref models", "test models", "ref reads", "test reads"],
+    );
     for (vname, names, cls, gate) in views {
         let mut nm = [[0usize; 4]; 2];
         let mut nw = [[0.0f64; 4]; 2];
@@ -495,7 +523,14 @@ pub fn novelty(c: &Ctx, rep: &mut Report) {
             if nm[0][k] + nm[1][k] == 0 {
                 continue;
             }
-            t.row(vec![vname.into(), names[k].into(), nm[0][k].to_string(), nm[1][k].to_string(), cnt(nw[0][k]), cnt(nw[1][k])]);
+            t.row(vec![
+                vname.into(),
+                names[k].into(),
+                nm[0][k].to_string(),
+                nm[1][k].to_string(),
+                cnt(nw[0][k]),
+                cnt(nw[1][k]),
+            ]);
             for (what, a, b) in [
                 ("models", pct(nm[0][k] as f64, tm[0]), pct(nm[1][k] as f64, tm[1])),
                 ("reads", pct(nw[0][k], tw[0]), pct(nw[1][k], tw[1])),
@@ -522,7 +557,11 @@ pub fn grouped(c: &Ctx, rep: &mut Report) {
             rep.warnings.push(format!("grouped file {} has no counterpart on the test side", gr.key));
             continue;
         };
-        let short = gr.key.trim_start_matches("discovered_transcript_grouped_").trim_end_matches("_counts.linear.tsv").trim_end_matches("counts.linear.tsv");
+        let short = gr
+            .key
+            .trim_start_matches("discovered_transcript_grouped_")
+            .trim_end_matches("_counts.linear.tsv")
+            .trim_end_matches("counts.linear.tsv");
         let short = if short.is_empty() { "grouped" } else { short.trim_end_matches('_') };
         // per-side, per-group model counts (global model idx)
         let mut names: Vec<String> = gr.groups.clone();
@@ -558,11 +597,23 @@ pub fn grouped(c: &Ctx, rep: &mut Report) {
         }
         let bad = (0..c.n()).filter(|&g| (sum_model[g] - c.model(g).count).abs() > 0.01).count();
         if bad > 0 {
-            rep.warnings.push(format!("{}: {bad} models whose grouped counts do not sum to the ungrouped count", gr.key));
+            rep.warnings
+                .push(format!("{}: {bad} models whose grouped counts do not sum to the ungrouped count", gr.key));
         }
-        let mut t = Table::new("grouped", format!("Grouped counts: {}", gr.key), &[
-            "group", "ref reads", "test reads", "rel diff", "match ref->test", "match test->ref", "spearman", "units",
-        ]);
+        let mut t = Table::new(
+            "grouped",
+            format!("Grouped counts: {}", gr.key),
+            &[
+                "group",
+                "ref reads",
+                "test reads",
+                "rel diff",
+                "match ref->test",
+                "match test->ref",
+                "spearman",
+                "units",
+            ],
+        );
         for (g, name) in names.iter().enumerate() {
             let mut wsum = [[0.0f64; 2]; 2]; // [side][matched?]
             let mut units: FxHashMap<u32, [f64; 2]> = FxHashMap::default();
@@ -583,14 +634,34 @@ pub fn grouped(c: &Ctx, rep: &mut Report) {
             let fr = pct(wsum[0][1], wsum[0][0] + wsum[0][1]);
             let ft = pct(wsum[1][1], wsum[1][0] + wsum[1][1]);
             let rd = pct(tot[g][1] - tot[g][0], tot[g][0]);
-            t.row(vec![name.clone(), cnt(tot[g][0]), cnt(tot[g][1]), f4(rd), f4(fr), f4(ft), f4(sp), x.len().to_string()]);
+            t.row(vec![
+                name.clone(),
+                cnt(tot[g][0]),
+                cnt(tot[g][1]),
+                f4(rd),
+                f4(fr),
+                f4(ft),
+                f4(sp),
+                x.len().to_string(),
+            ]);
             let pre = format!("grouped_{short}_{name}");
-            rep.metrics.push(Metric::new(format!("{pre}_spearman"), "grouped", "corr", sp, 1.0 - sp).thr(0.005).desc(
-                "per group: Spearman over matched units touched by the group (grouped counts summed per unit)",
-            ));
-            rep.metrics.push(Metric::new(format!("{pre}_chain_match_ref_to_test"), "grouped", "frac", fr, 1.0 - fr).thr(0.01).desc("per group: read-weighted chain match using grouped counts"));
-            rep.metrics.push(Metric::new(format!("{pre}_chain_match_test_to_ref"), "grouped", "frac", ft, 1.0 - ft).thr(0.01));
-            rep.metrics.push(Metric::new(format!("{pre}_total"), "grouped", "rel", rd, rd.abs()).sides(tot[g][0], tot[g][1]).desc("per group: relative difference of total grouped counts"));
+            rep.metrics.push(
+                Metric::new(format!("{pre}_spearman"), "grouped", "corr", sp, 1.0 - sp).thr(0.005).desc(
+                    "per group: Spearman over matched units touched by the group (grouped counts summed per unit)",
+                ),
+            );
+            rep.metrics.push(
+                Metric::new(format!("{pre}_chain_match_ref_to_test"), "grouped", "frac", fr, 1.0 - fr)
+                    .thr(0.01)
+                    .desc("per group: read-weighted chain match using grouped counts"),
+            );
+            rep.metrics
+                .push(Metric::new(format!("{pre}_chain_match_test_to_ref"), "grouped", "frac", ft, 1.0 - ft).thr(0.01));
+            rep.metrics.push(
+                Metric::new(format!("{pre}_total"), "grouped", "rel", rd, rd.abs())
+                    .sides(tot[g][0], tot[g][1])
+                    .desc("per group: relative difference of total grouped counts"),
+            );
         }
         rep.tables.push(t);
     }
@@ -609,9 +680,9 @@ pub fn breakdowns(c: &Ctx, rep: &mut Report) {
     };
     let hdr = ["", "ref models", "test models", "ref reads", "test reads", "match ref->test", "match test->ref"];
     if let Some(cat) = &c.cat {
-        let mut t = Table::new("breakdown", "By locus category (GFF3 gene type; D-A1 = not `gene`/intergenic)", &hdr);
+        let mut t = Table::new("breakdown", "By locus category (GFF3 gene type; * = not `gene`/intergenic)", &hdr);
         for (k, n) in c.cats.iter().enumerate() {
-            let label = if n != "gene" && n != "intergenic" { format!("{n} (D-A1)") } else { n.clone() };
+            let label = if n != "gene" && n != "intergenic" { format!("{n} *") } else { n.clone() };
             t.row(row_for(label, &|g| cat[g] as usize == k));
         }
         rep.tables.push(t);
@@ -622,7 +693,14 @@ pub fn breakdowns(c: &Ctx, rep: &mut Report) {
     }
     t.md_limit = 30;
     rep.tables.push(t);
-    let bins = [(0.0, 0.0, "0"), (1.0, 1.0, "1"), (2.0, 4.0, "2-4"), (5.0, 19.0, "5-19"), (20.0, 99.0, "20-99"), (100.0, f64::MAX, "100+")];
+    let bins = [
+        (0.0, 0.0, "0"),
+        (1.0, 1.0, "1"),
+        (2.0, 4.0, "2-4"),
+        (5.0, 19.0, "5-19"),
+        (20.0, 99.0, "20-99"),
+        (100.0, f64::MAX, "100+"),
+    ];
     let mut t = Table::new("breakdown", "By unit depth (max of ref/test reads in the model's match unit)", &hdr);
     for (lo, hi, n) in bins {
         t.row(row_for(n.into(), &|g| {
@@ -717,7 +795,9 @@ fn explain(c: &Ctx, idx: &SpanIdx, g: usize) -> (String, String) {
             best = Some((k, ov, o as usize));
         }
     }
-    let Some((k, _, o)) = best else { return ("".into(), "no overlapping model on the other side (same strand)".into()) };
+    let Some((k, _, o)) = best else {
+        return ("".into(), "no overlapping model on the other side (same strand)".into());
+    };
     let om = c.model(o);
     let near = format!("{} ({})", om.id, cnt(om.count));
     let (na, nb) = (m.exons.len() - 1, om.exons.len() - 1);
@@ -780,7 +860,12 @@ pub fn residuals(c: &Ctx, rep: &mut Report) -> String {
             continue;
         }
         let ids = |side: usize| {
-            let v: Vec<&str> = u.members.iter().filter(|&&g| usize::from(g as usize >= c.nr()) == side).map(|&g| c.model(g as usize).id.as_str()).collect();
+            let v: Vec<&str> = u
+                .members
+                .iter()
+                .filter(|&&g| usize::from(g as usize >= c.nr()) == side)
+                .map(|&g| c.model(g as usize).id.as_str())
+                .collect();
             if v.len() > 3 {
                 format!("{},... ({} models)", v[..3].join(","), v.len())
             } else {
@@ -806,7 +891,18 @@ pub fn residuals(c: &Ctx, rep: &mut Report) -> String {
         });
     }
     rows.sort_by(|a, b| b.weight.total_cmp(&a.weight).then_with(|| a.cols[1].cmp(&b.cols[1])));
-    let hdr = ["kind", "model(s)", "locus", "exons", "ref count", "test count", "category", "struct class", "nearest other-side model", "explanation"];
+    let hdr = [
+        "kind",
+        "model(s)",
+        "locus",
+        "exons",
+        "ref count",
+        "test count",
+        "category",
+        "struct class",
+        "nearest other-side model",
+        "explanation",
+    ];
     let mut t = Table::new("residuals", "Largest unmatched / discordant models (by read weight)", &hdr);
     t.md_limit = c.top;
     let mut tsv = hdr.join("\t") + "\n";

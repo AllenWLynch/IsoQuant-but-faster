@@ -126,7 +126,7 @@ pub fn index_from_models_named(chr: ChrIdx, models: &[TranscriptModel], delta: i
             }
         }
     }
-    // gene region = span of its isoforms (4.1 has no gene regions here; see CONTRACT_CHANGES #5)
+    // gene region = span of its isoforms (4.1 has no gene regions here)
     let mut seen = vec![false; idx.genes.len()];
     for r in &idx.iso {
         let p = gpos[&r.gene];

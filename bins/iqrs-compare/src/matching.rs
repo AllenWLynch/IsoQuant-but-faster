@@ -83,7 +83,8 @@ pub fn chain_key(m: &Model) -> Vec<i32> {
 
 /// Sorted mono-exon intervals `(chr, strand, s, e, idx)` for window queries.
 pub fn mono_list<'a>(models: impl Iterator<Item = (u32, &'a Model)>) -> Vec<(u32, u8, i32, i32, u32)> {
-    let mut v: Vec<_> = models.filter(|(_, m)| m.is_mono()).map(|(i, m)| (m.chr, m.strand, m.exons[0].0, m.exons[0].1, i)).collect();
+    let mut v: Vec<_> =
+        models.filter(|(_, m)| m.is_mono()).map(|(i, m)| (m.chr, m.strand, m.exons[0].0, m.exons[0].1, i)).collect();
     v.sort_unstable();
     v
 }
@@ -172,7 +173,15 @@ mod tests {
     use super::*;
 
     fn m(id: &str, strand: u8, exons: &[(i32, i32)], count: f64) -> Model {
-        Model { id: id.into(), gene: String::new(), chr: 0, strand, exons: exons.to_vec(), source: "IsoQuant".into(), count }
+        Model {
+            id: id.into(),
+            gene: String::new(),
+            chr: 0,
+            strand,
+            exons: exons.to_vec(),
+            source: "IsoQuant".into(),
+            count,
+        }
     }
 
     #[test]
@@ -194,9 +203,9 @@ mod tests {
         ];
         let t = vec![
             m("x", b'+', &[(5, 10), (20, 30), (40, 45)], 7.0),
-            m("y", b'+', &[(1, 11), (21, 30)], 2.0),           // intron shifted by 1
-            m("z", b'+', &[(1019, 1099)], 4.0),                // recip 0.81
-            m("w", b'+', &[(2000, 2099)], 1.0),                // wrong strand
+            m("y", b'+', &[(1, 11), (21, 30)], 2.0), // intron shifted by 1
+            m("z", b'+', &[(1019, 1099)], 4.0),      // recip 0.81
+            m("w", b'+', &[(2000, 2099)], 1.0),      // wrong strand
         ];
         let mt = match_models(&r, &t);
         let matched = |g: usize| mt.comps[mt.comp_of[g] as usize].matched();

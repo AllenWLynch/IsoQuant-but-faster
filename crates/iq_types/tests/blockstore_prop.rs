@@ -35,14 +35,29 @@ fn strand() -> impl Strategy<Value = Strand> {
 }
 
 fn gene_key() -> impl Strategy<Value = Option<GeneKey>> {
-    prop_oneof![Just(None), (0u32..5).prop_map(|g| Some(GeneKey::Ref(g))), (0u32..3).prop_map(|g| Some(GeneKey::Novel(g)))]
+    prop_oneof![
+        Just(None),
+        (0u32..5).prop_map(|g| Some(GeneKey::Ref(g))),
+        (0u32..3).prop_map(|g| Some(GeneKey::Novel(g)))
+    ]
 }
 fn iso_ref() -> impl Strategy<Value = Option<IsoRef>> {
-    prop_oneof![Just(None), (0u32..9).prop_map(|t| Some(IsoRef::Ref(t))), (0u32..9).prop_map(|t| Some(IsoRef::Model(t)))]
+    prop_oneof![
+        Just(None),
+        (0u32..9).prop_map(|t| Some(IsoRef::Ref(t))),
+        (0u32..9).prop_map(|t| Some(IsoRef::Model(t)))
+    ]
 }
 
 fn isoform_match() -> impl Strategy<Value = IsoformMatch> {
-    (gene_key(), iso_ref(), strand(), prop::sample::select(MatchClass::ALL.to_vec()), -5.0f64..5.0, prop::collection::vec(event(), 0..4))
+    (
+        gene_key(),
+        iso_ref(),
+        strand(),
+        prop::sample::select(MatchClass::ALL.to_vec()),
+        -5.0f64..5.0,
+        prop::collection::vec(event(), 0..4),
+    )
         .prop_map(|(gene, tx, tx_strand, class, penalty, ev)| IsoformMatch {
             gene,
             tx,
@@ -72,7 +87,19 @@ fn record(chains: Vec<Vec<Iv>>) -> impl Strategy<Value = ReadRecord> {
         (prop::bool::weighted(0.9), "[a-zA-Z0-9:_/]{1,20}"),
     )
         .prop_map(
-            |((corrected, raw), dels, pa, polya_found, st, mst, mapq, mm, group, (at, gat, matches), (same_region, name))| {
+            |(
+                (corrected, raw),
+                dels,
+                pa,
+                polya_found,
+                st,
+                mst,
+                mapq,
+                mm,
+                group,
+                (at, gat, matches),
+                (same_region, name),
+            )| {
                 ReadRecord {
                     idx: 0,
                     name,
@@ -95,14 +122,14 @@ fn record(chains: Vec<Vec<Iv>>) -> impl Strategy<Value = ReadRecord> {
 
 fn block(dense_idx: bool) -> impl Strategy<Value = Vec<ReadRecord>> {
     // a small pool of chains so that reads share them
-    prop::collection::vec(exon_list(8), 1..6)
-        .prop_flat_map(|pool| prop::collection::vec(record(pool), 0..40))
-        .prop_map(move |mut v| {
+    prop::collection::vec(exon_list(8), 1..6).prop_flat_map(|pool| prop::collection::vec(record(pool), 0..40)).prop_map(
+        move |mut v| {
             for (i, r) in v.iter_mut().enumerate() {
                 r.idx = if dense_idx { i as u32 } else { (i as u32) * 3 + 1 };
             }
             v
-        })
+        },
+    )
 }
 
 fn gaps(ex: &[Iv]) -> Vec<Iv> {

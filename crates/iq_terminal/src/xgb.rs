@@ -38,30 +38,18 @@ pub struct XgbModel {
 /// Base margins as xgboost 3.4.2 computes them for the bundled models (`base_score` string →
 /// f32 bits). Recomputing `-log(1/b - 1)` with other log routines is off by 1-3 ulp, which
 /// flips many margins (design §7.9); these bits were checked against the fixtures' margins.
-const KNOWN_BASE_MARGINS: &[(&str, u32)] = &[
-    ("[5.7763106E-1]", 0x3ea0_48e8),
-    ("[3.413823E-1]", 0xbf28_3a5a),
-];
+const KNOWN_BASE_MARGINS: &[(&str, u32)] = &[("[5.7763106E-1]", 0x3ea0_48e8), ("[3.413823E-1]", 0xbf28_3a5a)];
 
 fn field<'a>(v: &'a Value, k: &str) -> Result<&'a Value, String> {
-    v.get(k)
-        .ok_or_else(|| format!("xgb model: missing field `{k}`"))
+    v.get(k).ok_or_else(|| format!("xgb model: missing field `{k}`"))
 }
 
 fn arr<'a>(v: &'a Value, k: &str) -> Result<&'a Vec<Value>, String> {
-    field(v, k)?
-        .as_array()
-        .ok_or_else(|| format!("xgb model: `{k}` is not an array"))
+    field(v, k)?.as_array().ok_or_else(|| format!("xgb model: `{k}` is not an array"))
 }
 
 fn ints(v: &Value, k: &str) -> Result<Vec<i64>, String> {
-    arr(v, k)?
-        .iter()
-        .map(|x| {
-            x.as_i64()
-                .ok_or_else(|| format!("xgb model: `{k}` has a non-integer"))
-        })
-        .collect()
+    arr(v, k)?.iter().map(|x| x.as_i64().ok_or_else(|| format!("xgb model: `{k}` has a non-integer"))).collect()
 }
 
 impl XgbModel {
@@ -72,16 +60,12 @@ impl XgbModel {
     pub fn load(json: &[u8]) -> Result<XgbModel, String> {
         let root: Value = serde_json::from_slice(json).map_err(|e| format!("xgb model: {e}"))?;
         let learner = field(&root, "learner")?;
-        let objective = field(field(learner, "objective")?, "name")?
-            .as_str()
-            .unwrap_or("");
+        let objective = field(field(learner, "objective")?, "name")?.as_str().unwrap_or("");
         if objective != "binary:logistic" {
             return Err(format!("xgb model: unsupported objective {objective:?}"));
         }
         let lmp = field(learner, "learner_model_param")?;
-        let base_score = field(lmp, "base_score")?
-            .as_str()
-            .ok_or("xgb model: base_score not a string")?;
+        let base_score = field(lmp, "base_score")?.as_str().ok_or("xgb model: base_score not a string")?;
         let base_margin = match KNOWN_BASE_MARGINS.iter().find(|(s, _)| *s == base_score) {
             Some(&(_, bits)) => f32::from_bits(bits),
             None => {
@@ -110,21 +94,11 @@ impl XgbModel {
                 .iter()
                 // Every split condition of the bundled models is the shortest f32 repr, and
                 // decimal → f64 → f32 equals decimal → f32 for all of them (checked once in Python).
-                .map(|x| {
-                    x.as_f64()
-                        .map(|v| v as f32)
-                        .ok_or_else(|| "xgb model: bad split_conditions".to_string())
-                })
+                .map(|x| x.as_f64().map(|v| v as f32).ok_or_else(|| "xgb model: bad split_conditions".to_string()))
                 .collect::<Result<_, _>>()?;
             let n = lc.len();
-            if [rc.len(), si.len(), dl.len(), st.len(), sc.len()]
-                .iter()
-                .any(|&l| l != n)
-                || n == 0
-            {
-                return Err(format!(
-                    "xgb model: tree {t} has inconsistent array lengths"
-                ));
+            if [rc.len(), si.len(), dl.len(), st.len(), sc.len()].iter().any(|&l| l != n) || n == 0 {
+                return Err(format!("xgb model: tree {t} has inconsistent array lengths"));
             }
             if !arr(tree, "categories")?.is_empty() || st.iter().any(|&s| s != 0) {
                 return Err(format!("xgb model: tree {t} has categorical splits"));
@@ -144,9 +118,7 @@ impl XgbModel {
                 };
                 let feature = if leaf { 0 } else { si[i] };
                 if !(0..N_FEATURES as i64).contains(&feature) {
-                    return Err(format!(
-                        "xgb model: tree {t} node {i} splits on feature {feature}"
-                    ));
+                    return Err(format!("xgb model: tree {t} node {i} splits on feature {feature}"));
                 }
                 nodes.push(Node {
                     value: sc[i],
@@ -157,11 +129,7 @@ impl XgbModel {
                 });
             }
         }
-        Ok(XgbModel {
-            nodes,
-            roots,
-            base_margin,
-        })
+        Ok(XgbModel { nodes, roots, base_margin })
     }
 
     /// Raw margin (f32, trees summed in order from the hard-coded base margin).
@@ -172,11 +140,7 @@ impl XgbModel {
             let mut n = self.nodes[r as usize];
             while n.left != NO_CHILD {
                 let v = x[n.feature as usize];
-                let go_left = if v.is_nan() {
-                    n.default_left
-                } else {
-                    v < n.value
-                };
+                let go_left = if v.is_nan() { n.default_left } else { v < n.value };
                 n = self.nodes[if go_left { n.left } else { n.right } as usize];
             }
             m += n.value;
@@ -218,10 +182,7 @@ pub struct XgbModels {
 impl XgbModels {
     /// Loads the bundled `MODEL_POLYA_JSON` / `MODEL_TSS_JSON`.
     pub fn bundled() -> Result<XgbModels, String> {
-        Ok(XgbModels {
-            polya: XgbModel::load(crate::MODEL_POLYA_JSON)?,
-            tss: XgbModel::load(crate::MODEL_TSS_JSON)?,
-        })
+        Ok(XgbModels { polya: XgbModel::load(crate::MODEL_POLYA_JSON)?, tss: XgbModel::load(crate::MODEL_TSS_JSON)? })
     }
 
     /// Model by fixture name (`"polya"` / `"tss"`).
@@ -256,20 +217,11 @@ pub mod fixture {
     /// Judges one model output (margin, proba, label) against 4.1 (§3 U10a pass criteria):
     /// probabilities |Δ| ≤ 1e-6, labels exact unless |margin| < 1e-5. Margins are expected
     /// bit-equal; a margin difference alone (within the proba tolerance) is still reported.
-    pub(crate) fn judge_pred(
-        path: &str,
-        got: (f64, f64, i32),
-        want: (f64, f64, i32),
-        out: &mut Vec<DiffEntry>,
-    ) {
+    pub(crate) fn judge_pred(path: &str, got: (f64, f64, i32), want: (f64, f64, i32), out: &mut Vec<DiffEntry>) {
         let (gm, gp, gl) = got;
         let (wm, wp, wl) = want;
         let push = |out: &mut Vec<DiffEntry>, f: &str, g: String, w: String| {
-            out.push(DiffEntry {
-                path: format!("{path}.{f}"),
-                got: g,
-                want: w,
-            })
+            out.push(DiffEntry { path: format!("{path}.{f}"), got: g, want: w })
         };
         if (gp - wp).abs() > 1e-6 || gp.is_nan() != wp.is_nan() {
             push(out, "proba", gp.to_string(), wp.to_string());
@@ -286,10 +238,7 @@ pub mod fixture {
         if entries.is_empty() {
             Verdict::Exact
         } else {
-            Verdict::Mismatch(Diff {
-                entries,
-                ..Default::default()
-            })
+            Verdict::Mismatch(Diff { entries, ..Default::default() })
         }
     }
 
@@ -297,19 +246,13 @@ pub mod fixture {
     impl UnitFixture for U10aXgbPredict {
         const UNIT: &'static str = "U10a";
         const FN: &'static str = "xgb_predict";
-        const DEVIATIONS: &'static [iq_types::DevId] = &[iq_types::DevId::T1];
         type In = U10aXgbPredictIn;
         type Out = U10aXgbPredictOut;
 
         fn run(input: &Self::In, _ctx: &FixtureCtx) -> FixResult<Self::Out> {
-            let model = bundled_models()
-                .by_name(&input.model)
-                .ok_or_else(|| format!("unknown model {:?}", input.model))?;
-            let mut out = U10aXgbPredictOut {
-                labels: Vec::new(),
-                proba: Vec::new(),
-                margin: Vec::new(),
-            };
+            let model =
+                bundled_models().by_name(&input.model).ok_or_else(|| format!("unknown model {:?}", input.model))?;
+            let mut out = U10aXgbPredictOut { labels: Vec::new(), proba: Vec::new(), margin: Vec::new() };
             for f in &input.features {
                 let m = model.margin(&row(f)?);
                 let p = sigmoid(m);

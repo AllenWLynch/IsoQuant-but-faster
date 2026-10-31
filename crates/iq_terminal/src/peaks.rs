@@ -20,7 +20,7 @@
 //! heights in position order. This equals 4.1 on CPUs without x86-simd-sort; on SIMD CPUs 4.1
 //! can still differ for large tied arrays, so the fixture comparator (fixtures were captured on
 //! a SIMD CPU) accepts any 4.1 output consistent with some tie order as `Explained(D-T1)`.
-//! Deterministic in all builds; no quirk gate (user decision 2026-10-29).
+//! Deterministic on every CPU.
 
 use crate::xgb::{sigmoid, XgbModel, N_FEATURES};
 use iq_types::{Peak, Pos};
@@ -390,12 +390,7 @@ pub fn select_by_peak_distance(peaks: &[usize], x: &[u32], distance: usize) -> V
     select_by_peak_distance_ties(peaks, x, distance, Ties::Numpy)
 }
 
-fn select_by_peak_distance_ties(
-    peaks: &[usize],
-    x: &[u32],
-    distance: usize,
-    ties: Ties,
-) -> Vec<usize> {
+fn select_by_peak_distance_ties(peaks: &[usize], x: &[u32], distance: usize, ties: Ties) -> Vec<usize> {
     let order: Vec<usize> = if ties == Ties::Numpy {
         let pri: Vec<i64> = peaks.iter().map(|&p| x[p] as i64).collect();
         let mut o = np_argsort(&pri);
@@ -422,12 +417,7 @@ fn select_by_peak_distance_ties(
             k += 1;
         }
     }
-    peaks
-        .iter()
-        .zip(&keep)
-        .filter(|(_, &k)| k)
-        .map(|(&p, _)| p)
-        .collect()
+    peaks.iter().zip(&keep).filter(|(_, &k)| k).map(|(&p, _)| p).collect()
 }
 
 /// scipy `_peak_prominences` (wlen=None) for one peak: `(prominence, left_base, right_base)`.
@@ -519,12 +509,7 @@ fn rank_peaks_ties(rec: &HistRecord, ties: Ties) -> Vec<(usize, f64)> {
         let neg: Vec<i64> = rec.peaks.iter().map(|p| -(p.height as i64)).collect();
         order = np_argsort(&neg);
     } else {
-        order.sort_by(|&a, &b| {
-            rec.peaks[b]
-                .height
-                .cmp(&rec.peaks[a].height)
-                .then(tie_cmp(ties, a, b))
-        });
+        order.sort_by(|&a, &b| rec.peaks[b].height.cmp(&rec.peaks[a].height).then(tie_cmp(ties, a, b)));
     }
     let top = rec.peaks[order[0]].height as f64;
     order
@@ -606,12 +591,7 @@ pub fn detect_peaks_ties(hist: &Histogram, model: &XgbModel, ties: Ties) -> Opti
         // Unreachable (the zero padding guarantees a local maximum); ported anyway.
         let position = (record.start as i64 + record.mode) as Pos;
         let count = window_count(&record.padded, record.mode, record.mode);
-        peaks.push(Peak {
-            position,
-            count,
-            left: position,
-            right: position,
-        });
+        peaks.push(Peak { position, count, left: position, right: position });
     } else {
         for (i, rel) in rank_peaks_ties(&record, ties) {
             let features = feature_row(&record, &record.peaks[i], rel);
@@ -621,28 +601,16 @@ pub fn detect_peaks_ties(hist: &Histogram, model: &XgbModel, ties: Ties) -> Opti
             if accepted {
                 peaks.push(genomic_peak(&record, &record.peaks[i]));
             }
-            rows.push(ScoredPeak {
-                peak: i,
-                features,
-                margin,
-                proba,
-                accepted,
-            });
+            rows.push(ScoredPeak { peak: i, features, margin, proba, accepted });
         }
     }
-    Some(Detection {
-        record,
-        rows,
-        peaks,
-    })
+    Some(Detection { record, rows, peaks })
 }
 
 /// `fn detect_peaks(&Histogram, &XgbModel) -> Vec<Peak>`: accepted peaks in ranked order
 /// (height descending, D-T1 ties by position); empty for an empty histogram.
 pub fn detect_peaks(hist: &Histogram, model: &XgbModel) -> Vec<Peak> {
-    detect_peaks_detailed(hist, model)
-        .map(|d| d.peaks)
-        .unwrap_or_default()
+    detect_peaks_detailed(hist, model).map(|d| d.peaks).unwrap_or_default()
 }
 
 pub mod fixture {
@@ -653,7 +621,6 @@ pub mod fixture {
         PeakRecordFixture, PeakRowFixture, RawPeaksFixture, U10aDetectPeaksIn, U10aDetectPeaksOut,
     };
     use iq_types::fixture::{DiffEntry, FixResult, FixtureCtx, PyF64, UnitFixture, Verdict};
-    use iq_types::DevId;
 
     pub(crate) fn record_dto(r: &HistRecord) -> PeakRecordFixture {
         PeakRecordFixture {
@@ -700,7 +667,6 @@ pub mod fixture {
     impl UnitFixture for U10aDetectPeaks {
         const UNIT: &'static str = "U10a";
         const FN: &'static str = "detect_peaks_batch";
-        const DEVIATIONS: &'static [DevId] = &[DevId::T1];
         type In = U10aDetectPeaksIn;
         type Out = U10aDetectPeaksOut;
 
@@ -718,14 +684,8 @@ pub mod fixture {
 
     /// The runner with an explicit tie order.
     pub fn run_ties(input: &U10aDetectPeaksIn, ties: Ties) -> FixResult<U10aDetectPeaksOut> {
-        let model = bundled_models()
-            .by_name(&input.model)
-            .ok_or_else(|| format!("unknown model {:?}", input.model))?;
-        let mut out = U10aDetectPeaksOut {
-            records: Vec::new(),
-            rows: Vec::new(),
-            peaks: Vec::new(),
-        };
+        let model = bundled_models().by_name(&input.model).ok_or_else(|| format!("unknown model {:?}", input.model))?;
+        let mut out = U10aDetectPeaksOut { records: Vec::new(), rows: Vec::new(), peaks: Vec::new() };
         for (i, h) in input.histograms.iter().enumerate() {
             let hist: Histogram = h.iter().flatten().copied().collect();
             match detect_peaks_ties(&hist, model, ties) {
@@ -748,33 +708,14 @@ pub mod fixture {
         (a.is_nan() && b.is_nan()) || a == b || (a - b).abs() <= 1e-12 * a.abs().max(b.abs())
     }
 
-    fn push(
-        e: &mut Vec<DiffEntry>,
-        path: String,
-        got: impl std::fmt::Debug,
-        want: impl std::fmt::Debug,
-    ) {
-        e.push(DiffEntry {
-            path,
-            got: format!("{got:?}"),
-            want: format!("{want:?}"),
-        });
+    fn push(e: &mut Vec<DiffEntry>, path: String, got: impl std::fmt::Debug, want: impl std::fmt::Debug) {
+        e.push(DiffEntry { path, got: format!("{got:?}"), want: format!("{want:?}") });
     }
 
     /// Tie-independent record fields.
-    fn cmp_record_base(
-        p: &str,
-        g: &PeakRecordFixture,
-        w: &PeakRecordFixture,
-        e: &mut Vec<DiffEntry>,
-    ) {
+    fn cmp_record_base(p: &str, g: &PeakRecordFixture, w: &PeakRecordFixture, e: &mut Vec<DiffEntry>) {
         if (g.start, g.mode, &g.histogram) != (w.start, w.mode, &w.histogram) {
-            push(
-                e,
-                format!("{p}.start/mode/histogram"),
-                (g.start, g.mode),
-                (w.start, w.mode),
-            );
+            push(e, format!("{p}.start/mode/histogram"), (g.start, g.mode), (w.start, w.mode));
         }
         for (f, a, b) in [
             ("var", g.var, w.var),
@@ -788,37 +729,17 @@ pub mod fixture {
         }
     }
 
-    fn cmp_raw(
-        p: &str,
-        g: &Option<RawPeaksFixture>,
-        w: &Option<RawPeaksFixture>,
-        e: &mut Vec<DiffEntry>,
-    ) {
+    fn cmp_raw(p: &str, g: &Option<RawPeaksFixture>, w: &Option<RawPeaksFixture>, e: &mut Vec<DiffEntry>) {
         match (g, w) {
             (None, None) => {}
             (Some(g), Some(w)) => {
                 let ints = |r: &RawPeaksFixture| {
-                    (
-                        r.peak_location.clone(),
-                        r.peak_left.clone(),
-                        r.peak_right.clone(),
-                        r.peak_heights.clone(),
-                    )
+                    (r.peak_location.clone(), r.peak_left.clone(), r.peak_right.clone(), r.peak_heights.clone())
                 };
                 if ints(g) != ints(w) {
                     push(e, format!("{p}.raw_peaks"), ints(g), ints(w));
-                } else if !g
-                    .peak_width
-                    .iter()
-                    .zip(&w.peak_width)
-                    .all(|(&a, &b)| feq(a, b))
-                {
-                    push(
-                        e,
-                        format!("{p}.raw_peaks.peak_width"),
-                        &g.peak_width,
-                        &w.peak_width,
-                    );
+                } else if !g.peak_width.iter().zip(&w.peak_width).all(|(&a, &b)| feq(a, b)) {
+                    push(e, format!("{p}.raw_peaks.peak_width"), &g.peak_width, &w.peak_width);
                 }
             }
             _ => push(e, format!("{p}.raw_peaks"), g.is_some(), w.is_some()),
@@ -835,12 +756,7 @@ pub mod fixture {
                 push(e, format!("{p}.features[{k}]"), a.0, b.0);
             }
         }
-        judge_pred(
-            p,
-            (g.margin, g.proba, g.label),
-            (w.margin, w.proba, w.label),
-            e,
-        );
+        judge_pred(p, (g.margin, g.proba, g.label), (w.margin, w.proba, w.label), e);
     }
 
     /// Tolerant comparison (§3 U10a pass criteria); histograms that fail it are re-checked
@@ -848,20 +764,11 @@ pub mod fixture {
     pub fn compare_batch(got: &U10aDetectPeaksOut, want: &U10aDetectPeaksOut) -> Verdict {
         let mut e = Vec::new();
         if got.records.len() != want.records.len() || got.peaks.len() != want.peaks.len() {
-            push(
-                &mut e,
-                ".len()".into(),
-                got.records.len(),
-                want.records.len(),
-            );
+            push(&mut e, ".len()".into(), got.records.len(), want.records.len());
             return verdict(e);
         }
         let rows_of = |o: &U10aDetectPeaksOut, i: usize| -> Vec<PeakRowFixture> {
-            o.rows
-                .iter()
-                .filter(|r| r.hist as usize == i)
-                .cloned()
-                .collect()
+            o.rows.iter().filter(|r| r.hist as usize == i).cloned().collect()
         };
         let mut explained = false;
         // The case's model is not in `out`: it is the bundled model that reproduces iqrs's own
@@ -869,9 +776,7 @@ pub mod fixture {
         let model = got.rows.first().and_then(|r| {
             let f: [f64; N_FEATURES] = std::array::from_fn(|i| r.features[i].0);
             let ms = bundled_models();
-            [&ms.polya, &ms.tss]
-                .into_iter()
-                .find(|m| m.margin(&f) as f64 == r.margin)
+            [&ms.polya, &ms.tss].into_iter().find(|m| m.margin(&f) as f64 == r.margin)
         });
         for i in 0..want.records.len() {
             let p = format!(".records[{i}]");
@@ -887,34 +792,19 @@ pub mod fixture {
                     }
                     let mut te = Vec::new();
                     if g.peak_count != w.peak_count {
-                        push(
-                            &mut te,
-                            format!("{p}.peak_count"),
-                            g.peak_count,
-                            w.peak_count,
-                        );
+                        push(&mut te, format!("{p}.peak_count"), g.peak_count, w.peak_count);
                     }
                     cmp_raw(&p, &g.raw_peaks, &w.raw_peaks, &mut te);
                     let (grows, wrows) = (rows_of(got, i), rows_of(want, i));
                     if grows.len() != wrows.len() {
-                        push(
-                            &mut te,
-                            format!(".rows(hist {i}).len()"),
-                            grows.len(),
-                            wrows.len(),
-                        );
+                        push(&mut te, format!(".rows(hist {i}).len()"), grows.len(), wrows.len());
                     } else {
                         for (k, (a, b)) in grows.iter().zip(&wrows).enumerate() {
                             cmp_row(&format!(".rows(hist {i})[{k}]"), a, b, &mut te);
                         }
                     }
                     if got.peaks[i] != want.peaks[i] {
-                        push(
-                            &mut te,
-                            format!(".peaks[{i}]"),
-                            &got.peaks[i],
-                            &want.peaks[i],
-                        );
+                        push(&mut te, format!(".peaks[{i}]"), &got.peaks[i], &want.peaks[i]);
                     }
                     if te.is_empty() {
                         continue;
@@ -935,7 +825,7 @@ pub mod fixture {
             }
         }
         if e.is_empty() && explained {
-            Verdict::Explained(DevId::T1)
+            Verdict::Explained("D-T1")
         } else {
             verdict(e)
         }
@@ -954,11 +844,7 @@ pub mod fixture {
         let cand = local_maxima(x);
         let pad = HISTOGRAM_PAD as i64;
         let kept: Vec<usize> = match &w.raw_peaks {
-            Some(r) => r
-                .peak_location
-                .iter()
-                .map(|&l| (l + pad) as usize)
-                .collect(),
+            Some(r) => r.peak_location.iter().map(|&l| (l + pad) as usize).collect(),
             None => Vec::new(),
         };
         // 1. Distance filter: greedy by priority keeps a peak iff no earlier-kept peak lies
@@ -972,13 +858,8 @@ pub mod fixture {
             return Err("kept peaks closer than the distance".into());
         }
         for &c in cand.iter().filter(|c| !kept.contains(c)) {
-            if !kept
-                .iter()
-                .any(|&k| k.abs_diff(c) < PEAK_DISTANCE && x[k] >= x[c])
-            {
-                return Err(format!(
-                    "candidate {c} dropped without a dominating neighbour"
-                ));
+            if !kept.iter().any(|&k| k.abs_diff(c) < PEAK_DISTANCE && x[k] >= x[c]) {
+                return Err(format!("candidate {c} dropped without a dominating neighbour"));
             }
         }
         // 2. Raw peaks for K are tie-independent.
@@ -990,11 +871,7 @@ pub mod fixture {
             return Err(format!("raw peaks differ: {e:?}"));
         }
         if raw.is_empty() {
-            return if wrows.is_empty() && wpeaks.len() == 1 {
-                Ok(())
-            } else {
-                Err("mode fallback differs".into())
-            };
+            return if wrows.is_empty() && wpeaks.len() == 1 { Ok(()) } else { Err("mode fallback differs".into()) };
         }
         // 3. Ranking: 4.1's rows must be a height-descending order of K. Accepted rows are
         //    pinned to their peak by the reported peak tuple; rejected rows are matched to the
@@ -1034,18 +911,11 @@ pub mod fixture {
         if wrows.len() != rec.peaks.len() {
             return Err("row count differs".into());
         }
-        if wrows
-            .windows(2)
-            .any(|r| r[1].features[6].0 > r[0].features[6].0)
-        {
+        if wrows.windows(2).any(|r| r[1].features[6].0 > r[0].features[6].0) {
             return Err("rows not in height-descending order".into());
         }
-        let feats_eq = |a: &PeakRowFixture, b: &PeakRowFixture| {
-            a.features
-                .iter()
-                .zip(&b.features)
-                .all(|(x, y)| feq(x.0, y.0))
-        };
+        let feats_eq =
+            |a: &PeakRowFixture, b: &PeakRowFixture| a.features.iter().zip(&b.features).all(|(x, y)| feq(x.0, y.0));
         let mut used = vec![false; rec.peaks.len()];
         let mut assign = vec![usize::MAX; wrows.len()];
         let mut next_peak = 0;
@@ -1161,7 +1031,6 @@ mod tests {
         let o = np_argsort(&v);
         assert!(o.windows(2).all(|w| v[w[0]] <= v[w[1]]));
     }
-
 
     #[test]
     fn single_position() {

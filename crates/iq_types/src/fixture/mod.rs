@@ -5,7 +5,7 @@
 //! - [`read_cases`] / [`CaseReader`]: gzip JSON Lines readers; [`write_case_line`] writes
 //!   Python-identical bytes ([`pyjson`]).
 //! - [`FixtureCtx`]: one capture directory (`fixtures/<sample>/<slice>/`) with cached side
-//!   tables (`index/<sha1>.json`, `block/...`, `params.json`) and the run mode.
+//!   tables (`index/<sha1>.json`, `block/...`, `params.json`).
 //! - [`UnitFixture`]: what every unit implements, one impl per `(unit, fn)`;
 //!   [`Verdict`]; [`Registry`] + [`run_path`] power `iqrs-fixture run`.
 //! - [`diff`]: generic field-level diff.
@@ -27,7 +27,6 @@ pub use ids::{IdMaps, TxSpace};
 pub use pyjson::{to_py_string, PyF64};
 pub use schema::{BlockHeader, Case, IndexDump, ReadRecordFixture};
 
-use crate::dev::{with_quirks, DevId, QuirkSet, QUIRKS41};
 use crate::index::IsoformIndex;
 use crate::params::Params;
 use crate::read::ReadRecord;
@@ -151,7 +150,11 @@ pub fn unit_files(capdir: &Path, unit: &str) -> FixResult<Vec<PathBuf>> {
         let p = e?.path();
         let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if let Some(rest) = name.strip_prefix(unit) {
-            if rest == ".jsonl.gz" || (rest.starts_with('.') && rest.ends_with(".jsonl.gz") && rest[1..].starts_with(|c: char| c.is_ascii_digit())) {
+            if rest == ".jsonl.gz"
+                || (rest.starts_with('.')
+                    && rest.ends_with(".jsonl.gz")
+                    && rest[1..].starts_with(|c: char| c.is_ascii_digit()))
+            {
                 out.push(p);
             }
         }
@@ -201,16 +204,6 @@ impl<'a> CaseKey<'a> {
 // FixtureCtx
 // ------------------------------------------------------------------------------------------
 
-/// How a case is judged.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum RunMode {
-    /// All quirks on (`quirks41` build): must be exact.
-    Parity,
-    /// No quirks (= default build behaviour); with `quirks41` compiled in, mismatches are
-    /// attributed by re-running with one quirk at a time.
-    Default,
-}
-
 /// A loaded block side table (schema §2.2).
 #[derive(Debug)]
 pub struct LoadedBlock {
@@ -233,7 +226,6 @@ impl LoadedBlock {
 /// shared by every conversion in the run (behind a mutex: `ctx.ids()`).
 pub struct FixtureCtx {
     pub root: PathBuf,
-    pub mode: RunMode,
     pub diff_opts: DiffOptions,
     ids: Mutex<IdMaps>,
     params_json: Mutex<Option<Arc<serde_json::Map<String, serde_json::Value>>>>,
@@ -247,7 +239,6 @@ impl FixtureCtx {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         FixtureCtx {
             root: root.into(),
-            mode: if QUIRKS41 { RunMode::Parity } else { RunMode::Default },
             diff_opts: DiffOptions::default(),
             ids: Mutex::new(IdMaps::new()),
             params_json: Mutex::new(None),
@@ -293,7 +284,8 @@ impl FixtureCtx {
         }
         let path = self.root.join("index").join(format!("{sha1}.json"));
         let txt = std::fs::read_to_string(&path).map_err(|e| FixError(format!("{}: {e}", path.display())))?;
-        let d: Arc<IndexDump> = Arc::new(serde_json::from_str(&txt).map_err(|e| FixError(format!("{}: {e}", path.display())))?);
+        let d: Arc<IndexDump> =
+            Arc::new(serde_json::from_str(&txt).map_err(|e| FixError(format!("{}: {e}", path.display())))?);
         self.index_dumps.lock().unwrap().insert(sha1.to_owned(), d.clone());
         Ok(d)
     }
@@ -331,7 +323,8 @@ impl FixtureCtx {
 pub fn load_block(path: &Path, ids: &mut IdMaps) -> FixResult<LoadedBlock> {
     let mut lines = open_lines(path)?.lines();
     let first = lines.next().ok_or_else(|| FixError(format!("{}: empty block file", path.display())))??;
-    let header: BlockHeader = serde_json::from_str(&first).map_err(|e| FixError(format!("{}:1: {e}", path.display())))?;
+    let header: BlockHeader =
+        serde_json::from_str(&first).map_err(|e| FixError(format!("{}:1: {e}", path.display())))?;
     let mut fixtures = Vec::with_capacity(header.n_reads as usize);
     for (k, l) in lines.enumerate() {
         let l = l?;
@@ -373,8 +366,9 @@ pub fn capture_dir_of(path: &Path) -> PathBuf {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Verdict {
     Exact,
-    /// Differs from 4.1 only by the named deviation (§9).
-    Explained(DevId),
+    /// Differs from the capture only for a known, documented reason (e.g. `"D-T1"`: peak tie
+    /// order on the SIMD CPU that recorded the capture).
+    Explained(&'static str),
     Mismatch(Diff),
 }
 
@@ -394,10 +388,6 @@ pub trait UnitFixture {
     const UNIT: &'static str;
     /// `in.fn` value handled by this runner.
     const FN: &'static str;
-    /// Deviation IDs that may explain a default-build mismatch of this unit. Empty = try
-    /// every ID.
-    const DEVIATIONS: &'static [DevId] = &[];
-
     type In: DeserializeOwned;
     type Out: DeserializeOwned + Serialize + PartialEq + fmt::Debug;
 
@@ -414,31 +404,12 @@ pub trait UnitFixture {
         }
     }
 
-    /// Runs and judges one case according to `ctx.mode` (§3.0): parity = all quirks on;
-    /// default = no quirks, then (with `quirks41`) one quirk at a time to attribute.
+    /// Runs and judges one case (panics and run errors become mismatches).
     fn judge(input: &Self::In, want: &Self::Out, ctx: &FixtureCtx) -> Verdict {
-        let attempt = |set: QuirkSet| -> Verdict {
-            match catch_unwind(AssertUnwindSafe(|| with_quirks(set, || Self::run(input, ctx)))) {
-                Ok(Ok(got)) => Self::compare(&got, want, ctx),
-                Ok(Err(e)) => Verdict::Mismatch(Diff::error(format!("run failed: {e}"))),
-                Err(p) => Verdict::Mismatch(Diff::error(format!("panic: {}", panic_msg(&p)))),
-            }
-        };
-        match ctx.mode {
-            RunMode::Parity => attempt(QuirkSet::all()),
-            RunMode::Default => {
-                let v = attempt(QuirkSet::NONE);
-                if v.is_ok() || !QUIRKS41 {
-                    return v;
-                }
-                let ids = if Self::DEVIATIONS.is_empty() { DevId::ALL } else { Self::DEVIATIONS };
-                for &d in ids {
-                    if attempt(QuirkSet::only(d)) == Verdict::Exact {
-                        return Verdict::Explained(d);
-                    }
-                }
-                v
-            }
+        match catch_unwind(AssertUnwindSafe(|| Self::run(input, ctx))) {
+            Ok(Ok(got)) => Self::compare(&got, want, ctx),
+            Ok(Err(e)) => Verdict::Mismatch(Diff::error(format!("run failed: {e}"))),
+            Err(p) => Verdict::Mismatch(Diff::error(format!("panic: {}", panic_msg(&p)))),
         }
     }
 }
@@ -537,7 +508,7 @@ impl Registry {
 #[derive(Clone, Debug, Default)]
 pub struct Tally {
     pub exact: u64,
-    pub explained: BTreeMap<DevId, u64>,
+    pub explained: BTreeMap<&'static str, u64>,
     pub mismatch: u64,
     /// Run errors / panics (`todo!()` included), counted inside `mismatch` too.
     pub errors: u64,
@@ -641,7 +612,13 @@ impl fmt::Display for Summary {
 
 /// Runs every case of one unit file, adding to `summary`. Cases whose `unit` is not
 /// `only_unit` (when given) are skipped.
-pub fn run_file(reg: &Registry, path: &Path, ctx: &FixtureCtx, only_unit: Option<&str>, summary: &mut Summary) -> FixResult<()> {
+pub fn run_file(
+    reg: &Registry,
+    path: &Path,
+    ctx: &FixtureCtx,
+    only_unit: Option<&str>,
+    summary: &mut Summary,
+) -> FixResult<()> {
     for case in read_lines::<Case>(path)? {
         let case = case?;
         if only_unit.is_some_and(|u| u != case.unit) {
@@ -662,18 +639,16 @@ pub fn run_file(reg: &Registry, path: &Path, ctx: &FixtureCtx, only_unit: Option
 /// `iqrs-fixture run <unit> <file|dir>`: a file is run directly; a directory is treated as
 /// a capture dir (its `units/<unit>*.jsonl.gz`) or, if it has no `units/`, searched
 /// recursively for capture dirs. `unit = "all"` runs every unit file.
-pub fn run_path(reg: &Registry, unit: &str, path: &Path, mode: RunMode, summary: &mut Summary) -> FixResult<()> {
+pub fn run_path(reg: &Registry, unit: &str, path: &Path, summary: &mut Summary) -> FixResult<()> {
     let only = if unit == "all" { None } else { Some(unit) };
     if path.is_file() {
-        let mut ctx = FixtureCtx::open(path);
-        ctx.mode = mode;
+        let ctx = FixtureCtx::open(path);
         return run_file(reg, path, &ctx, only, summary);
     }
     let mut caps = Vec::new();
     find_capture_dirs(path, &mut caps)?;
     for cap in caps {
-        let mut ctx = FixtureCtx::new(&cap);
-        ctx.mode = mode;
+        let ctx = FixtureCtx::new(&cap);
         let files = match only {
             Some(u) => unit_files(&cap, u)?,
             None => all_unit_files(&cap)?,
@@ -692,7 +667,8 @@ pub fn find_capture_dirs(root: &Path, out: &mut Vec<PathBuf>) -> FixResult<()> {
         return Ok(());
     }
     if root.is_dir() {
-        let mut subs: Vec<PathBuf> = std::fs::read_dir(root)?.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir()).collect();
+        let mut subs: Vec<PathBuf> =
+            std::fs::read_dir(root)?.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir()).collect();
         subs.sort();
         for s in subs {
             find_capture_dirs(&s, out)?;

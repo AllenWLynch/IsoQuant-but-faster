@@ -34,20 +34,19 @@ use iq_read::polya::{ExternalPolyA, PolyAParams};
 use iq_read::{assignment_strand, check_antisense, process_alignment_into};
 use iq_types::read::flags;
 use iq_types::{
-    AlignedRead, Assignment, AssignmentType, Block, BlockStore, CombinedProfile, EventType, GroupPool,
-    IsoformIndex, IsoformMatch, Iv, Iv0, MatchClass, MatchEvent, Matches, Params, ReadRecord, RecordLite, RefSlice,
-    Strand, TagValue, NO_POLYA,
+    AlignedRead, Assignment, AssignmentType, Block, BlockStore, CombinedProfile, EventType, GroupPool, IsoformIndex,
+    IsoformMatch, Iv, Iv0, MatchClass, MatchEvent, Matches, Params, ReadRecord, RecordLite, RefSlice, Strand, TagValue,
+    NO_POLYA,
 };
 use rayon::prelude::*;
 use std::sync::RwLock;
 use std::time::Instant;
 
 // ------------------------------------------------------------------------------------------
-// Ownership (4.1 double processing; D-R2 retired)
+// Ownership (4.1 double processing)
 // ------------------------------------------------------------------------------------------
 
-/// Decides whether a record is processed by this block. Since D-R2 was retired
-/// (`validation/deviation_effects.md`), both builds follow 4.1: a record is processed by
+/// Decides whether a record is processed by this block. As in 4.1, a record is processed by
 /// every block whose fetch returns it, and U9 keeps the best copy.
 pub trait Owner: Sync {
     fn owns(&self, rec: &RecordLite<'_>) -> bool;
@@ -328,7 +327,13 @@ struct Ctx<'a> {
 
 impl Ctx<'_> {
     /// Evaluates one selected record into `out` (every field overwritten when `Kept`).
-    fn process(&self, rec: &RecordLite<'_>, sc: &mut ReadScratch, out: &mut ReadRecord, clock: &mut Clock<'_>) -> Outcome {
+    fn process(
+        &self,
+        rec: &RecordLite<'_>,
+        sc: &mut ReadScratch,
+        out: &mut ReadRecord,
+        clock: &mut Clock<'_>,
+    ) -> Outcome {
         if !process_alignment_into(rec, &self.pp, ExternalPolyA::default(), &mut sc.ar) {
             clock.lap(|t| &mut t.u4);
             return Outcome::NoExons;
@@ -571,12 +576,10 @@ impl<'a> BlockCollector<'a> {
 
     fn push_parallel(&mut self, recs: &[RecordLite<'_>]) {
         let ctx = &self.ctx;
-        // quirk switches are thread-local (quirks41 fixture runs): carry them into workers
-        let quirks = iq_types::current_quirks();
         let results: Vec<(Vec<ReadRecord>, u64, u64)> = self
             .sel
             .par_chunks(PAR_CHUNK)
-            .map_init(ReadScratch::default, |sc, chunk| iq_types::with_quirks(quirks, || {
+            .map_init(ReadScratch::default, |sc, chunk| {
                 let mut kept = Vec::with_capacity(chunk.len());
                 let (mut no_ex, mut mq) = (0u64, 0u64);
                 let mut clock = Clock::new(None);
@@ -589,7 +592,7 @@ impl<'a> BlockCollector<'a> {
                     }
                 }
                 (kept, no_ex, mq)
-            }))
+            })
             .collect();
         for (kept, no_ex, mq) in results {
             self.stats.no_exons += no_ex;

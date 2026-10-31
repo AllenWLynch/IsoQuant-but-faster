@@ -9,10 +9,10 @@
 //! 3. [`apply_resolution`] per block: patch types / multimapper flags and drop suspended
 //!    reads (re-indexing the block like the 4.1 loader does).
 //!
-//! D-C1: 4.1's `BasicReadAssignment.penalty_score` is always 0 (`min(0.0, penalty)`); iqrs
-//! uses `matches[0].penalty`. The gate is in [`BasicRead::from_view`].
+//! As in 4.1, `BasicReadAssignment.penalty_score` is always 0 (`min(0.0, penalty)`; see
+//! [`BasicRead::from_view`]).
 
-use iq_types::{quirk, AssignmentType, BlockStore, DevId, GeneKey, IsoRef, Iv, MultimapStrategy, Pos, ReadView};
+use iq_types::{AssignmentType, BlockStore, GeneKey, IsoRef, Iv, MultimapStrategy, Pos, ReadView};
 use std::collections::HashMap;
 
 /// `BasicReadAssignment` fields used by the resolver.
@@ -31,7 +31,7 @@ pub struct BasicRead {
     pub polya_found: bool,
     pub atype: AssignmentType,
     pub gene_atype: AssignmentType,
-    /// `matches[0].penalty` (D-C1; 4.1 always uses 0).
+    /// `min(0, matches[0].penalty)`, i.e. 0 in practice (as in 4.1).
     pub penalty: f64,
     /// Distinct genes of the matches, sorted (a set).
     pub genes: Vec<GeneKey>,
@@ -50,7 +50,8 @@ impl BasicRead {
         isoforms.sort_unstable();
         isoforms.dedup();
         let p0 = v.first_match().map_or(0.0, |m| m.penalty());
-        let penalty = if quirk(DevId::C1) { if v.n_matches() > 0 { p0.min(0.0) } else { 0.0 } } else { p0 };
+        // Matches IsoQuant 4.1: `BasicReadAssignment.penalty_score` is effectively always 0.
+        let penalty = if v.n_matches() > 0 { p0.min(0.0) } else { 0.0 };
         BasicRead {
             block,
             row: v.row() as u32,
@@ -321,7 +322,11 @@ pub struct DupOutcome {
 /// - **Suspended reads are removed** from their store, and the remaining rows are re-indexed
 ///   densely. This matches what `ReadAssignmentLoader.get_next` hands to every construct
 ///   and quant stage, so downstream code needs no filter.
-pub fn resolve_chr_duplicates(stores: &mut [BlockStore], candidates: Option<&[u64]>, strategy: MultimapStrategy) -> DupOutcome {
+pub fn resolve_chr_duplicates(
+    stores: &mut [BlockStore],
+    candidates: Option<&[u64]>,
+    strategy: MultimapStrategy,
+) -> DupOutcome {
     let mut out = DupOutcome::default();
     let is_cand = |h: u64| candidates.is_none_or(|c| c.binary_search(&h).is_ok());
     // groups by name, in first-appearance order

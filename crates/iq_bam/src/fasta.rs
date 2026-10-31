@@ -34,7 +34,26 @@ impl FastaIndex {
     /// Opens `fa` and its `fa.fai`.
     pub fn open(fa: &Path) -> io::Result<FastaIndex> {
         let fai = PathBuf::from(format!("{}.fai", fa.display()));
-        let txt = std::fs::read_to_string(&fai).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", fai.display())))?;
+        if fa.extension().is_some_and(|x| x == "gz" || x == "bgz") {
+            return Err(invalid(format!(
+                "{}: compressed references are not supported; decompress it first",
+                fa.display()
+            )));
+        }
+        let txt = std::fs::read_to_string(&fai).map_err(|e| {
+            if e.kind() == io::ErrorKind::NotFound && fa.exists() {
+                io::Error::new(
+                    e.kind(),
+                    format!(
+                        "reference index {} not found; create it with `samtools faidx {}`",
+                        fai.display(),
+                        fa.display()
+                    ),
+                )
+            } else {
+                io::Error::new(e.kind(), format!("{}: {e}", fai.display()))
+            }
+        })?;
         let f = File::open(fa).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", fa.display())))?;
         // SAFETY: the reference is opened read-only and is not modified while mapped.
         let map = unsafe { Mmap::map(&f)? };
@@ -49,11 +68,19 @@ impl FastaIndex {
                     .and_then(|v| v.parse().ok())
                     .ok_or_else(|| invalid(format!("{}:{}: bad fai line", fai.display(), k + 1)))
             };
-            let e = FaiEntry { name: c[0].to_owned(), len: num(1)?, offset: num(2)?, line_bases: num(3)?, line_bytes: num(4)? };
+            let e = FaiEntry {
+                name: c[0].to_owned(),
+                len: num(1)?,
+                offset: num(2)?,
+                line_bases: num(3)?,
+                line_bytes: num(4)?,
+            };
             if e.len > 0 && (e.line_bases == 0 || e.line_bytes < e.line_bases) {
                 return Err(invalid(format!("{}:{}: bad line lengths", fai.display(), k + 1)));
             }
-            let last = e.offset + (e.len.saturating_sub(1) / e.line_bases.max(1)) * e.line_bytes + (e.len.saturating_sub(1) % e.line_bases.max(1));
+            let last = e.offset
+                + (e.len.saturating_sub(1) / e.line_bases.max(1)) * e.line_bytes
+                + (e.len.saturating_sub(1) % e.line_bases.max(1));
             if e.len > 0 && last >= map.len() as u64 {
                 return Err(invalid(format!("{}: {} extends past the end of {}", fai.display(), e.name, fa.display())));
             }

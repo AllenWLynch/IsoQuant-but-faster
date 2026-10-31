@@ -2,7 +2,7 @@
 //! The authoritative gate is `iqrs-fixture run U10a ../fixtures`; this test keeps the crate
 //! self-checking without the binary.
 
-use iq_types::fixture::{run_path, Registry, RunMode, Summary};
+use iq_types::fixture::{run_path, Registry, Summary};
 use std::path::PathBuf;
 
 #[test]
@@ -15,18 +15,10 @@ fn u10a_fixtures() {
     }
     let mut reg = Registry::new();
     iq_terminal::register_fixtures(&mut reg);
-    let mode = if iq_types::QUIRKS41 {
-        RunMode::Parity
-    } else {
-        RunMode::Default
-    };
     let mut s = Summary::new(5);
-    run_path(&reg, "U10a", &root, mode, &mut s).unwrap();
+    run_path(&reg, "U10a", &root, &mut s).unwrap();
     for ((u, f), t) in &s.by_key {
-        eprintln!(
-            "{u} {f}: exact {} explained {:?} mismatch {}",
-            t.exact, t.explained, t.mismatch
-        );
+        eprintln!("{u} {f}: exact {} explained {:?} mismatch {}", t.exact, t.explained, t.mismatch);
         for (c, d) in &t.examples {
             eprintln!("  {c}\n{d}");
         }

@@ -185,25 +185,23 @@ pub fn execute<P: Pipeline>(p: &P, opts: &EngineOpts) -> Result<Report, String> 
     }
 
     let (tx, rx) = crossbeam_channel::unbounded::<Ev<P>>();
-    pool.in_place_scope(|scope| {
-        loop {
-            if co.done() {
+    pool.in_place_scope(|scope| loop {
+        if co.done() {
+            break;
+        }
+        co.admit(scope, &tx, &global);
+        if co.adm.running == 0 {
+            if co.error.is_some() || co.done() {
                 break;
             }
-            co.admit(scope, &tx, &global);
-            if co.adm.running == 0 {
-                if co.error.is_some() || co.done() {
-                    break;
-                }
-                if co.queue.is_empty() {
-                    co.error = Some("scheduler stalled: nothing running and nothing ready".into());
-                    break;
-                }
-                continue;
+            if co.queue.is_empty() {
+                co.error = Some("scheduler stalled: nothing running and nothing ready".into());
+                break;
             }
-            let ev = rx.recv().expect("channel closed while tasks run");
-            co.on_event(ev, &global);
+            continue;
         }
+        let ev = rx.recv().expect("channel closed while tasks run");
+        co.on_event(ev, &global);
     });
     // Drain events of tasks that finished after the loop (none expected: running == 0).
     drop(tx);
@@ -488,9 +486,7 @@ impl<'a, P: Pipeline> Coord<'a, P> {
                 });
                 match r {
                     Ok(stores) => {
-                        self.log(|| {
-                            format!("collected unit {u} ({reads} reads): est {est} B, actual {bytes} B")
-                        });
+                        self.log(|| format!("collected unit {u} ({reads} reads): est {est} B, actual {bytes} B"));
                         if self.p.can_spill() && self.adm.resident > self.adm.budget / 2 {
                             self.unit_stores[u] = Some(stores);
                             self.chrs[chr].as_mut().unwrap().pending_spill += 1;

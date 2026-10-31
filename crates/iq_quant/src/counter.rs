@@ -58,19 +58,12 @@ pub enum Strategy {
 
 /// Branch of `add_read_info` for assignment type `atype` and `n_features` distinct features.
 /// `has_matches` = `isoform_matches` non-empty.
-pub fn read_fate(
-    strategy: Strategy,
-    atype: AssignmentType,
-    has_matches: bool,
-    n_features: usize,
-) -> ReadFate {
+pub fn read_fate(strategy: Strategy, atype: AssignmentType, has_matches: bool, n_features: usize) -> ReadFate {
     if atype.is_unassigned() || !has_matches || n_features == 0 {
         ReadFate::NoFeature
     } else if atype == AssignmentType::Ambiguous {
         // process_ambiguous: 1 feature -> 1.0; several -> 0.0 (no use_ambiguous)
-        ReadFate::Ambiguous {
-            weight_one: n_features == 1,
-        }
+        ReadFate::Ambiguous { weight_one: n_features == 1 }
     } else if atype.is_inconsistent() {
         // process_inconsistent: no strategy here has use_inconsistent; only
         // unique_splicing_consistent has use_inconsistent_minor
@@ -190,13 +183,7 @@ impl TxCounter {
         }
         // `has_matches`: U19 always produces matches for reads that name a model, and a
         // read without models is `__no_feature` either way.
-        self.inner.add_features(
-            Strategy::UniqueOnly,
-            fa.atype,
-            !uniq.is_empty(),
-            &uniq,
-            group,
-        )
+        self.inner.add_features(Strategy::UniqueOnly, fa.atype, !uniq.is_empty(), &uniq, group)
     }
 
     /// Ungrouped count of a model.
@@ -223,11 +210,7 @@ mod tests {
     use AssignmentType as A;
 
     fn fa(atype: A, tx: &[u32]) -> FinalAssign {
-        FinalAssign {
-            atype,
-            gene_atype: atype,
-            tx: tx.iter().copied().collect(),
-        }
+        FinalAssign { atype, gene_atype: atype, tx: tx.iter().copied().collect() }
     }
 
     #[test]
@@ -243,10 +226,7 @@ mod tests {
         c.add(&fa(A::Intergenic, &[3]), 1);
         assert_eq!(c.count(3), 2.0);
         assert_eq!(c.count(4), 1.0);
-        assert_eq!(
-            c.state(3).unwrap().groups,
-            Groups::from_vec(vec![(1, 1.0), (2, 1.0), (3, 0.0)])
-        );
+        assert_eq!(c.state(3).unwrap().groups, Groups::from_vec(vec![(1, 1.0), (2, 1.0), (3, 0.0)]));
         let s4 = c.state(4).unwrap();
         assert_eq!(s4.groups, Groups::from_vec(vec![(3u32, 0.0), (1, 1.0)]));
         assert!(s4.in_all);

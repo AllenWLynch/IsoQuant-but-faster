@@ -15,7 +15,7 @@
 
 use crate::assign::{Assignment, GeneKey, IsoRef, IsoformMatch, MatchEvent};
 use crate::enums::{AssignmentType, MatchClass};
-use crate::prim::{Iv, Pos, PolyAInfo, Strand};
+use crate::prim::{Iv, PolyAInfo, Pos, Strand};
 use crate::read::ReadRecord;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -118,8 +118,7 @@ impl ChainTable {
             [] => (Self::NONE, 0, 0),
             [only] => (Self::MONO, only.s, only.e),
             _ => {
-                let gaps: SmallVec<[Iv; 16]> =
-                    exons.windows(2).map(|w| Iv::new(w[0].e + 1, w[1].s - 1)).collect();
+                let gaps: SmallVec<[Iv; 16]> = exons.windows(2).map(|w| Iv::new(w[0].e + 1, w[1].s - 1)).collect();
                 (self.intern(&gaps), exons[0].s, exons[exons.len() - 1].e)
             }
         }

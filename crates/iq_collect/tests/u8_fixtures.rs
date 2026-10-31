@@ -1,15 +1,13 @@
 //! U8/U9 fixture checks over `$IQRS_FIXTURES` (default `../fixtures`), skipped when absent.
 //!
-//! - `fixtures_pass`: parity (quirks41) / attributed default.
+//! - `fixtures_pass`: every U9 case exact.
 //! - `parallel_equals_serial`: every U8 case collected serially and on a 4-thread pool.
-//! - `default_attribution_per_read` (ignored, quirks41): per-read attribution of default-build diffs.
 //! - `fullchr8_throughput` (ignored): single-threaded collect timing by stage.
 
 use iq_collect::fixture::U8Prepared;
 use iq_types::fixture::schema::{ReadRecordFixture, U8CollectBlockIn};
-use iq_types::fixture::{find_capture_dirs, read_cases, run_path, unit_files, FixtureCtx, Registry, RunMode, Summary};
-use iq_types::{with_quirks, DevId, QuirkSet};
-use std::collections::{BTreeMap, HashMap};
+use iq_types::fixture::{find_capture_dirs, read_cases, run_path, unit_files, FixtureCtx, Registry, Summary};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -24,7 +22,9 @@ fn captures() -> Vec<PathBuf> {
     let mut v = Vec::new();
     find_capture_dirs(&r, &mut v).unwrap();
     // finished captures only (a capture in progress has no manifest / a `U8.<pid>` file)
-    v.retain(|d| d.join("slice").is_dir() && d.join("fixture_manifest.json").is_file() && d.join("units/U8.jsonl.gz").is_file());
+    v.retain(|d| {
+        d.join("slice").is_dir() && d.join("fixture_manifest.json").is_file() && d.join("units/U8.jsonl.gz").is_file()
+    });
     v.sort();
     v
 }
@@ -44,15 +44,14 @@ fn u8_inputs(cap: &std::path::Path) -> Vec<(String, U8CollectBlockIn, Vec<ReadRe
 fn fixtures_pass() {
     let mut reg = Registry::new();
     iq_collect::register_fixtures(&mut reg);
-    let mode = if iq_types::QUIRKS41 { RunMode::Parity } else { RunMode::Default };
     let mut s = Summary::new(3);
     for cap in captures() {
         if cap.join("units/U9.jsonl.gz").is_file() {
-            run_path(&reg, "U9", &cap, mode, &mut s).unwrap();
+            run_path(&reg, "U9", &cap, &mut s).unwrap();
         }
     }
     eprintln!("{s}");
-    assert!(s.all_ok() || !iq_types::QUIRKS41, "{s}");
+    assert!(s.all_ok(), "{s}");
 }
 
 #[test]
@@ -76,84 +75,6 @@ fn parallel_equals_serial() {
         }
     }
     eprintln!("parallel == serial on {n_cases} blocks, {n_reads} reads");
-}
-
-type Key = (String, u32);
-
-fn keyed(v: Vec<ReadRecordFixture>) -> HashMap<Key, ReadRecordFixture> {
-    let mut seen: HashMap<String, u32> = HashMap::new();
-    v.into_iter()
-        .map(|mut r| {
-            r.assignment_id = 0;
-            r.idx = 0;
-            let k = seen.entry(r.name.clone()).or_default();
-            let key = (r.name.clone(), *k);
-            *k += 1;
-            (key, r)
-        })
-        .collect()
-}
-
-/// Per-read attribution of default-build differences (needs `--features quirks41`):
-/// each read whose default output differs from the fixture is attributed to the single
-/// deviation whose quirk alone restores it.
-#[test]
-#[ignore]
-fn default_attribution_per_read() {
-    if !iq_types::QUIRKS41 {
-        eprintln!("run with --features quirks41");
-        return;
-    }
-    let devs = [DevId::R1, DevId::P1, DevId::P3, DevId::A3, DevId::A4];
-    let mut by_dev: BTreeMap<&str, u64> = BTreeMap::new();
-    let (mut total, mut differing, mut unexplained) = (0u64, 0u64, 0u64);
-    for cap in captures() {
-        let ctx = FixtureCtx::new(&cap);
-        for (case, input, want) in u8_inputs(&cap) {
-            total += want.len() as u64;
-            let run = |set: QuirkSet| {
-                with_quirks(set, || {
-                    let p = U8Prepared::load(&input, &ctx).unwrap();
-                    let (st, _, _) = p.collect(&ctx, true, false);
-                    keyed(p.to_fixture(&st, &ctx))
-                })
-            };
-            let want = keyed(want);
-            let d = run(QuirkSet::NONE);
-            let mut keys: Vec<&Key> = want.keys().chain(d.keys()).collect();
-            keys.sort();
-            keys.dedup();
-            let diff: Vec<&Key> = keys.into_iter().filter(|k| want.get(*k) != d.get(*k)).collect();
-            if diff.is_empty() {
-                continue;
-            }
-            let singles: Vec<_> = devs.iter().map(|&x| (x, run(QuirkSet::only(x)))).collect();
-            for k in diff {
-                differing += 1;
-                match singles.iter().find(|(_, s)| s.get(k) == want.get(k)) {
-                    Some((x, _)) => *by_dev.entry(x.label()).or_default() += 1,
-                    None => {
-                        // two deviations on the same read
-                        let pair = devs.iter().enumerate().flat_map(|(a, &x)| devs[a + 1..].iter().map(move |&y| (x, y))).find(|&(x, y)| {
-                            run(QuirkSet::only(x).with(y)).get(k) == want.get(k)
-                        });
-                        match pair {
-                            Some((x, y)) => { let _ = (x, y); *by_dev.entry("two-deviation").or_default() += 1 },
-                            None => {
-                                unexplained += 1;
-                                eprintln!("unexplained: {case} {k:?}");
-                            }
-                        }
-                        if let Some((x, y)) = pair {
-                            eprintln!("two deviations: {case} {k:?}: {}+{}", x.label(), y.label());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    eprintln!("reads (fixture): {total}; differing in default build: {differing}; by deviation: {by_dev:?}; unexplained: {unexplained}");
-    assert_eq!(unexplained, 0);
 }
 
 /// Whole-chromosome collect throughput, single-threaded, from prefetched records (fetch and
@@ -213,14 +134,11 @@ fn fullchr8_throughput() {
     }
 }
 
-/// U8 → U9 on whole captures (quirks41): collect every block, resolve duplicate names per
+/// U8 → U9 on whole captures: collect every block, resolve duplicate names per
 /// chromosome, and compare each store with the loader's `block/` file (post-resolution,
 /// suspended reads dropped).
 #[test]
 fn u9_chr_resolution_matches_block_files() {
-    if !iq_types::QUIRKS41 {
-        return;
-    }
     use iq_types::fixture::schema::BlockRef;
     let (mut n_blocks, mut n_groups, mut n_susp, mut n_totals) = (0, 0, 0, 0);
     for cap in captures() {
@@ -228,7 +146,8 @@ fn u9_chr_resolution_matches_block_files() {
             continue;
         }
         let m: iq_types::serde_json::Value =
-            iq_types::serde_json::from_str(&std::fs::read_to_string(cap.join("fixture_manifest.json")).unwrap()).unwrap();
+            iq_types::serde_json::from_str(&std::fs::read_to_string(cap.join("fixture_manifest.json")).unwrap())
+                .unwrap();
         if m["skipped_blocks"].as_array().is_some_and(|a| !a.is_empty()) {
             eprintln!("{}: has skipped blocks; not comparable", cap.display());
             continue;
@@ -254,7 +173,8 @@ fn u9_chr_resolution_matches_block_files() {
         for (chr, mut blocks) in by_chr {
             blocks.sort_by_key(|b| b.0);
             let mut stores: Vec<_> = blocks.iter_mut().map(|b| std::mem::take(&mut b.1)).collect();
-            let o = iq_collect::multimap::resolve_chr_duplicates(&mut stores, None, iq_types::MultimapStrategy::TakeBest);
+            let o =
+                iq_collect::multimap::resolve_chr_duplicates(&mut stores, None, iq_types::MultimapStrategy::TakeBest);
             n_groups += o.groups;
             tot += o.total;
             pa += o.polya;

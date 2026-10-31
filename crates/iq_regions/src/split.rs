@@ -159,7 +159,7 @@ mod tests {
         let out = bins_from(10, &v);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0], (Iv0 { s: 10 * 256 + 1, e: 210 * 256 }, 100)); // start = bin*256+1 (4.1 mixed coords)
-        // the valley bin starts the next region; its own coverage seeds max_cov
+                                                                          // the valley bin starts the next region; its own coverage seeds max_cov
         assert_eq!(out[1], (Iv0 { s: 210 * 256 + 1, e: 411 * 256 - 1 }, 50));
     }
 

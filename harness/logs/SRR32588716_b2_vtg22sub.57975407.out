@@ -1,2 +1,0 @@
-{"bam": "/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r/data/vtg.bam", "regions": ["22:24462404-25048722"], "requested": ["22:24462404-25048722"], "hp_synthesis": "HP:Z sha1(qname)[:16] % 3 -> A|B|unphased", "slice_bam": "/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r/fixtures/SRR32588716/b2_vtg22sub/slice/SRR32588716.b2_vtg22sub.bam", "n_records": 354414, "subsample": 0.02, "subsample_rule": "keep iff int(sha1('sub:'+qname)[:16],16)/2**64 < subsample"}
-done SRR32588716 b2_vtg22sub

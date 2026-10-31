@@ -1,5 +1,4 @@
-//! U18: `TranscriptToGeneJoiner` (`model_construction/transcript_to_gene_joiner.py:17-125`),
-//! D-M6.
+//! U18: `TranscriptToGeneJoiner` (`model_construction/transcript_to_gene_joiner.py:17-125`).
 //!
 //! Joins novel genes into overlapping annotated genes, or into each other, by rewriting the
 //! models' gene keys. Scoring is verbatim (design §7.10): same strand only; shared introns →
@@ -28,11 +27,10 @@
 //! order). The choice only decides which key the merged group keeps; in all fixture cases
 //! the resulting partition of models into genes is identical either way.
 //!
-//! ## D-M6
-//! 4.1 loops `while len(self.scores) > 1`, so a last remaining pair is never merged. iqrs
-//! loops while any pair remains; `quirk(DevId::M6)` restores 4.1.
+//! ## Last pair (matches IsoQuant 4.1)
+//! 4.1 loops `while len(self.scores) > 1`, so a last remaining pair is never merged.
 
-use iq_types::{quirk, DevId, GeneKey, IsoRef, IsoformIndex, Iv, ModelKind, Strand, TranscriptModel};
+use iq_types::{GeneKey, IsoRef, IsoformIndex, Iv, ModelKind, Strand, TranscriptModel};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 
@@ -223,8 +221,8 @@ pub fn join_genes_by(models: &mut [TranscriptModel], index: &IsoformIndex, novel
     // --- join_transcripts -----------------------------------------------------------------------
     // 4.1 `len(self.scores)`: pairs of live genes, not both annotated.
     let live_pairs = |n_novel: u64| n_novel * n_novel.saturating_sub(1) / 2 + n_novel * n_annot;
-    let min_pairs = if quirk(DevId::M6) { 2 } else { 1 };
-    while live_pairs(n_novel) >= min_pairs {
+    // Matches IsoQuant 4.1: `while len(self.scores) > 1` never merges the last pair.
+    while live_pairs(n_novel) >= 2 {
         // `max(scores, key=get)`: first maximal entry in key order.
         let mut best: Option<((u32, u32), f64)> = None;
         for (&k, &s) in &scores {
@@ -315,7 +313,6 @@ pub(crate) mod fixture {
     impl UnitFixture for U18Join {
         const UNIT: &'static str = "U18";
         const FN: &'static str = "join_transcripts";
-        const DEVIATIONS: &'static [DevId] = &[DevId::M6];
         type In = U18JoinIn;
         type Out = ModelsOut;
 
@@ -371,20 +368,13 @@ mod tests {
         }
     }
 
-    /// D-M6: a single (annotated, novel) pair is merged only without the quirk.
+    /// A single (annotated, novel) pair is never merged (4.1 `len(scores) > 1`).
     #[test]
     fn single_pair() {
         let index = index_with_gene((100, 200));
         let mut ms = vec![model(0, GeneKey::Novel(0), &[(120, 150), (170, 220)])];
-        let mut q = ms.clone();
-        iq_types::with_quirks(iq_types::QuirkSet::NONE, || join_genes(&mut ms, &index));
-        assert_eq!(ms[0].gene, GeneKey::Ref(0));
-        #[cfg(feature = "quirks41")]
-        {
-            iq_types::with_quirks(iq_types::QuirkSet::only(DevId::M6), || join_genes(&mut q, &index));
-            assert_eq!(q[0].gene, GeneKey::Novel(0));
-        }
-        let _ = &mut q;
+        join_genes(&mut ms, &index);
+        assert_eq!(ms[0].gene, GeneKey::Novel(0));
     }
 
     /// Two novel genes sharing an intron: the comparator-greater one survives; weak overlap
@@ -397,7 +387,7 @@ mod tests {
             model(1, GeneKey::Novel(1), &[(120, 150), (200, 300)]),
             model(2, GeneKey::Novel(2), &[(280, 600)]),
         ];
-        iq_types::with_quirks(iq_types::QuirkSet::NONE, || join_genes_by(&mut ms, &index, |a, b| b.cmp(&a)));
+        join_genes_by(&mut ms, &index, |a, b| b.cmp(&a));
         assert_eq!(ms[0].gene, GeneKey::Novel(0));
         assert_eq!(ms[1].gene, GeneKey::Novel(0));
         assert_eq!(ms[2].gene, GeneKey::Novel(2));

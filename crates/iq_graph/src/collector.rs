@@ -1,8 +1,8 @@
 //! `IntronCollector` (`intron_graph.py:41-146`): intron counting, similarity clustering
-//! (D-G1, D-G2), the correction map and discarded introns.
+//! (4.1 tie and min-count behaviour), the correction map and discarded introns.
 
 use crate::pyds::PyDict;
-use iq_types::{quirk, BlockStore, ChainTable, DevId, Iv, Vertex};
+use iq_types::{BlockStore, ChainTable, Iv, Vertex};
 use std::collections::{HashMap, HashSet};
 
 /// Collector state. Keys are intron vertices (`Vertex(s, e)`, `s >= 0`).
@@ -90,10 +90,12 @@ impl IntronCollector {
                 let mut best: Option<(u32, Vertex)> = None;
                 for &j in &sim[i as usize] {
                     let s = ordered[j as usize];
-                    let Some(&c) = self.clustered.get(&s) else { continue };
-                    // 4.1 sorts (count_of_current, similar): the largest tuple wins (D-G1);
-                    // iqrs prefers the largest clustered count, then the largest tuple.
-                    let key = if quirk(DevId::G1) { (0, s) } else { (c, s) };
+                    if self.clustered.get(&s).is_none() {
+                        continue;
+                    }
+                    // Matches IsoQuant 4.1: it sorts (count_of_current, similar), so the largest
+                    // intron tuple wins regardless of the similar intron's own count.
+                    let key = (0, s);
                     if best.is_none_or(|b| key > b) {
                         best = Some(key);
                     }
@@ -104,12 +106,8 @@ impl IntronCollector {
                         self.correction.insert(intron, sub);
                     }
                     None => {
-                        // D-G2: 4.1 skips the min-count test here.
-                        if !quirk(DevId::G2) && count < min_count {
-                            self.discarded.insert(intron);
-                        } else {
-                            self.clustered.insert(intron, count);
-                        }
+                        // Matches IsoQuant 4.1: the min-count test is skipped here.
+                        self.clustered.insert(intron, count);
                     }
                 }
             } else if count < min_count {
@@ -182,7 +180,6 @@ impl IntronCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iq_types::{with_quirks, QuirkSet, QUIRKS41};
 
     fn v(s: i64, e: i64) -> Vertex {
         Vertex(s, e)
@@ -193,27 +190,22 @@ mod tests {
         let mut c = IntronCollector::new(&[], 4);
         let all: HashMap<Vertex, u32> = [(v(100, 200), 10), (v(102, 201), 2), (v(500, 600), 1)].into_iter().collect();
         c.cluster_introns(&all, 1);
-        assert_eq!(c.clustered.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>(), vec![(v(100, 200), 12), (v(500, 600), 1)]);
+        assert_eq!(
+            c.clustered.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+            vec![(v(100, 200), 12), (v(500, 600), 1)]
+        );
         assert_eq!(c.correction.get(&v(102, 201)), Some(&v(100, 200)));
     }
 
-    /// Two clustered candidates: 4.1 takes the largest tuple, iqrs the largest count.
+    /// Two clustered candidates: 4.1 takes the largest tuple, not the largest count.
     #[test]
     fn cluster_tie_g1() {
         // A=(100,200) count 10, B=(108,200) count 9 (not similar to A: Δs=8 > 4),
         // C=(104,200) count 1, similar to both.
         let all: HashMap<Vertex, u32> = [(v(100, 200), 10), (v(108, 200), 9), (v(104, 200), 1)].into_iter().collect();
-        let run = |set| {
-            with_quirks(set, || {
-                let mut c = IntronCollector::new(&[], 4);
-                c.cluster_introns(&all, 1);
-                c.correction.get(&v(104, 200)).copied()
-            })
-        };
-        assert_eq!(run(QuirkSet::NONE), Some(v(100, 200)));
-        if QUIRKS41 {
-            assert_eq!(run(QuirkSet::only(DevId::G1)), Some(v(108, 200)));
-        }
+        let mut c = IntronCollector::new(&[], 4);
+        c.cluster_introns(&all, 1);
+        assert_eq!(c.correction.get(&v(104, 200)).copied(), Some(v(108, 200)));
     }
 
     /// Similar neighbours that are all unclustered: 4.1 keeps the intron regardless of count.
@@ -222,17 +214,9 @@ mod tests {
         // A known? no. A=(100,200) count 1, B=(102,200) count 1, min_count 2. A is processed
         // first (larger tuple is B: (1,B) > (1,A)), so B first: similar A not clustered.
         let all: HashMap<Vertex, u32> = [(v(100, 200), 1), (v(102, 200), 1)].into_iter().collect();
-        let run = |set| {
-            with_quirks(set, || {
-                let mut c = IntronCollector::new(&[], 4);
-                c.cluster_introns(&all, 2);
-                (c.clustered.len(), c.discarded.len())
-            })
-        };
-        assert_eq!(run(QuirkSet::NONE), (0, 2));
-        if QUIRKS41 {
-            // B kept (no min-count test), A then substitutes into B.
-            assert_eq!(run(QuirkSet::only(DevId::G2)), (1, 0));
-        }
+        let mut c = IntronCollector::new(&[], 4);
+        c.cluster_introns(&all, 2);
+        // B kept (no min-count test), A then substitutes into B.
+        assert_eq!((c.clustered.len(), c.discarded.len()), (1, 0));
     }
 }

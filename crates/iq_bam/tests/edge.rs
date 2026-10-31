@@ -4,7 +4,7 @@
 //! 150 random regions). cargo runs tests with the crate dir as cwd.
 
 use iq_bam::{try_fetch, BamHandle, FetchOpts, RecordBatch};
-use iq_types::fixture::{read_lines, run_path, Case, Registry, RunMode, Summary};
+use iq_types::fixture::{read_lines, run_path, Case, Registry, Summary};
 use iq_types::Iv0;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -16,8 +16,7 @@ fn edge_fixture_exact() {
     let mut reg = Registry::new();
     iq_bam::register_fixtures(&mut reg);
     let mut s = Summary::new(5);
-    let mode = if iq_types::QUIRKS41 { RunMode::Parity } else { RunMode::Default };
-    run_path(&reg, "U2", Path::new("tests/data/edge"), mode, &mut s).unwrap();
+    run_path(&reg, "U2", Path::new("tests/data/edge"), &mut s).unwrap();
     eprintln!("{s}");
     let t = &s.by_key[&("U2".to_owned(), "fetch".to_owned())];
     assert!(t.exact > 10_000 && t.mismatch == 0 && t.decode_error == 0, "{s}");
@@ -64,8 +63,14 @@ fn no_seq_option_and_batching() {
     let b = all(FetchOpts::default(), &bam);
     assert!(a.len() > 1);
     assert!(a.iter().enumerate().all(|(k, x)| x.seq_no == k as u64 && x.len() <= 7));
-    let ra: Vec<_> = a.iter().flat_map(|x| x.iter().map(|r| (r.qname.to_vec(), r.pos0, r.cigar.to_vec(), r.tag.cloned(), r.seq.len()))).collect();
-    let rb: Vec<_> = b.iter().flat_map(|x| x.iter().map(|r| (r.qname.to_vec(), r.pos0, r.cigar.to_vec(), r.tag.cloned(), 0))).collect();
+    let ra: Vec<_> = a
+        .iter()
+        .flat_map(|x| x.iter().map(|r| (r.qname.to_vec(), r.pos0, r.cigar.to_vec(), r.tag.cloned(), r.seq.len())))
+        .collect();
+    let rb: Vec<_> = b
+        .iter()
+        .flat_map(|x| x.iter().map(|r| (r.qname.to_vec(), r.pos0, r.cigar.to_vec(), r.tag.cloned(), 0)))
+        .collect();
     assert_eq!(ra, rb);
     // multithreaded inflate gives the same records
     bam.set_threads(3);

@@ -1,7 +1,8 @@
 """Extra U1(b) cases straight from gffutils + 4.1 GeneInfo, plus an exon_id table."""
 import sys, os, gzip, random, hashlib
-R = "/n/data1/hms/dbmi/park/allen_l/lariat/isoquant_r"
-sys.path.insert(0, R + "/IsoQuant"); sys.path.insert(0, R + "/iqrs/harness")
+# project root holding IsoQuant/ (4.1 clone), iqrs/ and data/; default: the parent of the iqrs checkout
+R = os.environ.get("IQRS_PROJECT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
+sys.path.insert(0, R + "/IsoQuant"); sys.path.insert(0, R + "/iqrs/dev/harness")
 import gffutils
 from isoquant_lib.gene_info import GeneInfo
 from isoquant_lib.utils.id_policy import FeatureIdStorage, SimpleIDDistributor

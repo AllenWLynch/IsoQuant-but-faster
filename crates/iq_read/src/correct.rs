@@ -17,8 +17,8 @@
 //! No deviations: the 4.1 behaviour of all three functions is kept as is.
 
 use iq_types::{
-    match_consts, AlignedRead, Assignment, AssignmentType, EventType, IsoformIndex, Iv, MatchClass, MatchEvent,
-    Params, PolyAInfo, Pos, RecordLite, RefSlice, Strand,
+    match_consts, AlignedRead, Assignment, AssignmentType, EventType, IsoformIndex, Iv, MatchClass, MatchEvent, Params,
+    PolyAInfo, Pos, RecordLite, RefSlice, Strand,
 };
 
 // ------------------------------------------------------------------------------------------
@@ -401,22 +401,21 @@ pub fn correct_read_with<R: RefBases + ?Sized>(
             .zip(&potential)
             .enumerate()
             .map(|(i, (&ri, &pi))| {
-                let site_ok = |start: Pos, end: Pos, left: bool| {
-                    match error_count(rec, exons, reference, start as i64, end as i64, i, left) {
-                        Some((indel, mm)) => indel == 0 && mm <= 1,
-                        None => false,
-                    }
+                let site_ok = |start: Pos, end: Pos, left: bool| match error_count(
+                    rec,
+                    exons,
+                    reference,
+                    start as i64,
+                    end as i64,
+                    i,
+                    left,
+                ) {
+                    Some((indel, mm)) => indel == 0 && mm <= 1,
+                    None => false,
                 };
-                let left = if ri.s == pi.s || site_ok(ri.s.min(pi.s), ri.s.max(pi.s) - 1, true) {
-                    ri.s
-                } else {
-                    pi.s
-                };
-                let right = if ri.e == pi.e || site_ok(ri.e.min(pi.e) + 1, ri.e.max(pi.e), false) {
-                    ri.e
-                } else {
-                    pi.e
-                };
+                let left = if ri.s == pi.s || site_ok(ri.s.min(pi.s), ri.s.max(pi.s) - 1, true) { ri.s } else { pi.s };
+                let right =
+                    if ri.e == pi.e || site_ok(ri.e.min(pi.e) + 1, ri.e.max(pi.e), false) { ri.e } else { pi.e };
                 Iv::new(left, right)
             })
             .collect()
@@ -672,8 +671,7 @@ pub(crate) mod fixture {
                 wins.push(RefSlice { start: iv.e - 1, seq: acceptor.as_bytes() });
             }
             wins.sort_by_key(|w| w.start);
-            let strand =
-                assignment_strand(&a, i.exons.len(), i.corrected_introns.iter().copied(), i.polya, &wins[..]);
+            let strand = assignment_strand(&a, i.exons.len(), i.corrected_introns.iter().copied(), i.polya, &wins[..]);
             Ok(U7StrandOut { strand })
         }
     }
@@ -798,7 +796,8 @@ mod tests {
         let pos0 = 99;
         let c = cig(&[(S, 3), (M, 20), (I, 2), (M, 5), (N, 50), (M, 3), (D, 2), (M, 10), (N, 40), (M, 1)]);
         let exons = crate::cigar::read_blocks(pos0, &c).ref_blocks;
-        let qlen: u32 = c.iter().filter_map(|&w| pair_op(w)).filter(|(k, _)| !matches!(k, PairKind::Ref)).map(|(_, l)| l).sum();
+        let qlen: u32 =
+            c.iter().filter_map(|&w| pair_op(w)).filter(|(k, _)| !matches!(k, PairKind::Ref)).map(|(_, l)| l).sum();
         let seq: Vec<u8> = (0..qlen).map(|i| b"ACGT"[(i * 7 % 4) as usize]).collect();
         let refseq: Vec<u8> = (0..400).map(|i| b"ACGT"[(i * 3 % 4) as usize]).collect();
         let r = RefSlice { start: 1, seq: &refseq };
@@ -894,12 +893,7 @@ mod tests {
         let mut reg = iq_types::fixture::Registry::new();
         register_fixtures(&mut reg);
         let mut sum = iq_types::fixture::Summary::new(3);
-        let mode = if iq_types::QUIRKS41 {
-            iq_types::fixture::RunMode::Parity
-        } else {
-            iq_types::fixture::RunMode::Default
-        };
-        iq_types::fixture::run_path(&reg, "U7", &root, mode, &mut sum).unwrap();
+        iq_types::fixture::run_path(&reg, "U7", &root, &mut sum).unwrap();
         println!("{sum}");
         assert!(sum.all_ok());
     }

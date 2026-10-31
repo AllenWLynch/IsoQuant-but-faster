@@ -9,7 +9,7 @@
 //! regions.tsv: `chr<TAB>s<TAB>e` (1-based closed). Build with `--features htslib` to add the
 //! htslib rows.
 
-use iq_bam::{try_fetch, BamHandle, FetchOpts, FastaIndex, RecordBatch};
+use iq_bam::{try_fetch, BamHandle, FastaIndex, FetchOpts, RecordBatch};
 use iq_types::{Iv, Iv0};
 use std::path::Path;
 use std::time::Instant;
@@ -65,7 +65,9 @@ impl Sink {
     fn eat(&mut self, b: &RecordBatch) {
         for r in b.iter() {
             self.records += 1;
-            self.acc = self.acc.wrapping_add(r.qname.len() as u64 + r.flag as u64 + r.mapq as u64 + r.end0() as u64 + r.seq.len() as u64);
+            self.acc = self.acc.wrapping_add(
+                r.qname.len() as u64 + r.flag as u64 + r.mapq as u64 + r.end0() as u64 + r.seq.len() as u64,
+            );
         }
     }
 }
@@ -206,9 +208,18 @@ fn main() {
                 }
                 std::hint::black_box(sink.acc);
                 let s = t.elapsed().as_secs_f64();
-                println!("noodles\tregions\t1\tseq\t{}\t{s:.3}\t{:.0}\t{:.1}\t{n} regions, {kb:.0} kb", sink.records, sink.records as f64 / s, n as f64 / s);
+                println!(
+                    "noodles\tregions\t1\tseq\t{}\t{s:.3}\t{:.0}\t{:.1}\t{n} regions, {kb:.0} kb",
+                    sink.records,
+                    sink.records as f64 / s,
+                    n as f64 / s
+                );
                 if let Some((m, s)) = htslib_regions(bam, chr, &regs) {
-                    println!("htslib\tregions\t1\tseq\t{m}\t{s:.3}\t{:.0}\t{:.1}\t{n} regions, {kb:.0} kb", m as f64 / s, n as f64 / s);
+                    println!(
+                        "htslib\tregions\t1\tseq\t{m}\t{s:.3}\t{:.0}\t{:.1}\t{n} regions, {kb:.0} kb",
+                        m as f64 / s,
+                        n as f64 / s
+                    );
                 }
             }
         }
@@ -219,7 +230,9 @@ fn main() {
             for (chr, iv) in read_regions(&a[3]) {
                 let mut hash = 0u32;
                 let mut count = 0u64;
-                for b in try_fetch(&h, &chr, Iv0 { s: iv.s as i64 - 1, e: iv.e as i64 - 1 }, FetchOpts::default()).unwrap() {
+                for b in
+                    try_fetch(&h, &chr, Iv0 { s: iv.s as i64 - 1, e: iv.e as i64 - 1 }, FetchOpts::default()).unwrap()
+                {
                     let b = b.unwrap();
                     for r in b.iter() {
                         count += 1;

@@ -5,7 +5,7 @@
 
 use iq_terminal::counter::{TerminalAccumulator, TerminalKind};
 use iq_types::fixture::schema::{PredictionsOut, U10bFlushIn};
-use iq_types::fixture::{read_cases, run_path, unit_files, FixtureCtx, Registry, RunMode, Summary};
+use iq_types::fixture::{read_cases, run_path, unit_files, FixtureCtx, Registry, Summary};
 use iq_types::IsoRef;
 use std::path::PathBuf;
 
@@ -23,9 +23,8 @@ fn u10b_fixtures() {
     };
     let mut reg = Registry::new();
     iq_terminal::register_fixtures(&mut reg);
-    let mode = if iq_types::QUIRKS41 { RunMode::Parity } else { RunMode::Default };
     let mut s = Summary::new(5);
-    run_path(&reg, "U10b", &root, mode, &mut s).unwrap();
+    run_path(&reg, "U10b", &root, &mut s).unwrap();
     for ((u, f), t) in &s.by_key {
         eprintln!("{u} {f}: exact {} explained {:?} mismatch {}", t.exact, t.explained, t.mismatch);
         for (c, d) in &t.examples {
@@ -55,7 +54,10 @@ fn u10b_accumulation_by_case_key() {
                     }
                     let got: Vec<(String, Vec<i32>)> = {
                         let ids = ctx.ids();
-                        acc.transcripts().into_iter().map(|(t, d)| (ids.iso_name(IsoRef::Ref(t)).to_owned(), d)).collect()
+                        acc.transcripts()
+                            .into_iter()
+                            .map(|(t, d)| (ids.iso_name(IsoRef::Ref(t)).to_owned(), d))
+                            .collect()
                     };
                     let want: Vec<(String, Vec<i32>)> =
                         case.input.transcripts.iter().map(|(t, e)| (t.clone(), e.data.clone())).collect();

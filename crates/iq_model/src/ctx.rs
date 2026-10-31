@@ -2,7 +2,9 @@
 //! `model_construction/context.py:113-224`).
 
 use iq_types::indexmap::IndexSet;
-use iq_types::{Assignment, BlockStore, CombinedProfile, IntronGraph, IsoformIndex, Params, PathStorage, Predictions, TxIdx};
+use iq_types::{
+    Assignment, BlockStore, CombinedProfile, IntronGraph, IsoformIndex, Params, PathStorage, Predictions, TxIdx,
+};
 
 /// `detected_known_isoforms`, scoped per work unit (D-M2), insertion-ordered.
 pub type DetectedKnown = IndexSet<TxIdx>;
@@ -12,7 +14,13 @@ pub type DetectedKnown = IndexSet<TxIdx>;
 pub trait ReadAssigner: Sync {
     /// Assign a profile against `index` (`quick_mode` as in 4.1 `assign_to_isoform`).
     /// `read_key` identifies the call for replay (read index or provisional model key).
-    fn assign(&self, index: &IsoformIndex, profile: &CombinedProfile, quick_mode: bool, read_key: u64) -> Option<Assignment>;
+    fn assign(
+        &self,
+        index: &IsoformIndex,
+        profile: &CombinedProfile,
+        quick_mode: bool,
+        read_key: u64,
+    ) -> Option<Assignment>;
 }
 
 /// Per-block construction context.

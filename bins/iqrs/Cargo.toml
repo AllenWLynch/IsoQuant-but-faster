@@ -1,20 +1,20 @@
 [package]
 name = "iqrs"
-description = "iqrs CLI: streamlined pure-Rust reimplementation of IsoQuant 4.1.0"
+description = "Fast Rust reimplementation of IsoQuant 4.1 transcript discovery and quantification for long RNA reads"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[features]
-quirks41 = ["iq_types/quirks41", "iq_sched/quirks41"]
-
 [dependencies]
 iq_types.workspace = true
 iq_sched.workspace = true
 lexopt.workspace = true
-anyhow.workspace = true
+
+# musl's malloc does not scale with threads (3x slower at 16 threads); static musl builds use mimalloc.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1", default-features = false }
 
 [lints]
 workspace = true

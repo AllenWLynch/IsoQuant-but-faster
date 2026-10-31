@@ -113,7 +113,8 @@ pub fn construct_assignment_based_reads(
             if s < en {
                 e.spans.push((s, en));
             }
-            let polya_ev = if strand == Strand::Plus { EventType::CorrectPolyaSiteRight } else { EventType::CorrectPolyaSiteLeft };
+            let polya_ev =
+                if strand == Strand::Plus { EventType::CorrectPolyaSiteRight } else { EventType::CorrectPolyaSiteLeft };
             if has_event(&r, polya_ev) {
                 e.polya += 1;
             }
@@ -266,7 +267,8 @@ fn cluster_monoexons(groups: IndexMap<Pos, Vec<ReadIdx>>, apa_delta: i64) -> Vec
         if !remaining.contains_key(&top) {
             continue;
         }
-        let hit: Vec<(i64, usize)> = remaining.range(top - apa_delta..=top + apa_delta).map(|(&p, &j)| (p, j)).collect();
+        let hit: Vec<(i64, usize)> =
+            remaining.range(top - apa_delta..=top + apa_delta).map(|(&p, &j)| (p, j)).collect();
         let mut reads = Vec::new();
         for (p, j) in hit {
             remaining.remove(&p);
@@ -396,8 +398,8 @@ pub(crate) mod fixture {
 mod tests {
     use super::*;
     use iq_types::{
-        Assignment, AssignmentType, GeneKey, IntronGraph, IsoRec, IsoformMatch, MatchClass, MatchEvent, Params, PathStorage,
-        PolyAInfo, Predictions, ReadRecord, Vertex, NO_POLYA,
+        Assignment, AssignmentType, GeneKey, IntronGraph, IsoRec, IsoformMatch, MatchClass, MatchEvent, Params,
+        PathStorage, PolyAInfo, Predictions, ReadRecord, Vertex, NO_POLYA,
     };
 
     struct NoAssigner;
@@ -430,7 +432,14 @@ mod tests {
         ix
     }
 
-    fn read(idx: u32, exons: &[Iv], atype: AssignmentType, tx: Option<u32>, events: &[EventType], polya: PolyAInfo) -> ReadRecord {
+    fn read(
+        idx: u32,
+        exons: &[Iv],
+        atype: AssignmentType,
+        tx: Option<u32>,
+        events: &[EventType],
+        polya: PolyAInfo,
+    ) -> ReadRecord {
         let matches = match tx {
             Some(t) => [IsoformMatch::new(
                 MatchClass::FullSpliceMatch,
@@ -462,7 +471,14 @@ mod tests {
         }
     }
 
-    fn run(recs: &[ReadRecord], params: &Params, graph: &IntronGraph, paths: &PathStorage, dk: &mut DetectedKnown, ms: &mut ModelStore) {
+    fn run(
+        recs: &[ReadRecord],
+        params: &Params,
+        graph: &IntronGraph,
+        paths: &PathStorage,
+        dk: &mut DetectedKnown,
+        ms: &mut ModelStore,
+    ) {
         let ix = index();
         let store = BlockStore::from_records(recs);
         let preds = Predictions::default();
@@ -523,7 +539,10 @@ mod tests {
         let mut paths = PathStorage::default();
         paths.known_isoforms_in_graph.insert(vec![Vertex(1101, 1199)].into_boxed_slice(), 1);
         let full = [Iv::new(1010, 1100), Iv::new(1200, 1290)];
-        let recs = [read(0, &full, u, Some(1), &[EventType::Fsm], NO_POLYA), read(1, &full, u, Some(1), &[EventType::Fsm], NO_POLYA)];
+        let recs = [
+            read(0, &full, u, Some(1), &[EventType::Fsm], NO_POLYA),
+            read(1, &full, u, Some(1), &[EventType::Fsm], NO_POLYA),
+        ];
         let (mut dk, mut ms) = (DetectedKnown::default(), ModelStore::new(2));
         run(&recs, &p, &IntronGraph::default(), &paths, &mut dk, &mut ms);
         assert_eq!(ms.models.len(), 1);

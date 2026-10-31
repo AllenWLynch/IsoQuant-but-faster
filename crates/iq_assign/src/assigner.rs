@@ -20,8 +20,8 @@ use iq_types::fixture::{FixResult, FixtureCtx, UnitFixture};
 use iq_types::index::prof_kind;
 use iq_types::params::{MatchingParams, SpliceCorrection, MINIMAL_SCORE, TOP_SCORED_FACTOR};
 use iq_types::{
-    quirk, AmbiguityResolving, Assignment, AssignmentType, CombinedProfile, DevId, EventType, Events,
-    IsoRef, IsoformIndex, IsoformMatch, Iv, MappedReadProfile, MatchClass, MatchEvent, Matches, PolyAInfo, Strand,
+    AmbiguityResolving, Assignment, AssignmentType, CombinedProfile, EventType, Events, IsoRef, IsoformIndex,
+    IsoformMatch, Iv, MappedReadProfile, MatchClass, MatchEvent, Matches, PolyAInfo, Strand,
 };
 
 /// Parameters the assigner is built with (the 4.1 `params` object; schema §2.3
@@ -122,12 +122,24 @@ pub(crate) struct Assigner<'a> {
 
 /// `assign_to_isoform` (`:438-507`). `None` where 4.1 returns `None` (schema U6 `out`
 /// `assignment: null`; 4.1 always returns an assignment here).
-pub fn assign(index: &IsoformIndex, params: &AssignParams, profile: &CombinedProfile, polya: PolyAInfo, scratch: &mut Scratch) -> Option<Assignment> {
+pub fn assign(
+    index: &IsoformIndex,
+    params: &AssignParams,
+    profile: &CombinedProfile,
+    polya: PolyAInfo,
+    scratch: &mut Scratch,
+) -> Option<Assignment> {
     assign_with(index, params, profile, polya, &mut scratch.assign)
 }
 
 /// [`assign`] with an explicit [`AssignScratch`].
-pub fn assign_with(index: &IsoformIndex, params: &AssignParams, profile: &CombinedProfile, polya: PolyAInfo, scratch: &mut AssignScratch) -> Option<Assignment> {
+pub fn assign_with(
+    index: &IsoformIndex,
+    params: &AssignParams,
+    profile: &CombinedProfile,
+    polya: PolyAInfo,
+    scratch: &mut AssignScratch,
+) -> Option<Assignment> {
     let mut a = Assigner { index, params, polya, scratch };
     Some(match a.route(profile) {
         Route::Early(x) | Route::Consistent(x) => x,
@@ -242,13 +254,19 @@ pub(crate) fn extra_exon_percentage(region: (i64, i64), read: &[Iv]) -> f64 {
 pub(crate) fn mono_exon_classification(events: &[MatchEvent]) -> MatchClass {
     use EventType as E;
     if events.iter().any(|e| {
-        matches!(e.ty, E::AlternativePolyaSiteLeft | E::AlternativePolyaSiteRight | E::InternalPolyaLeft | E::InternalPolyaRight)
+        matches!(
+            e.ty,
+            E::AlternativePolyaSiteLeft | E::AlternativePolyaSiteRight | E::InternalPolyaLeft | E::InternalPolyaRight
+        )
     }) {
         return MatchClass::NovelNotInCatalog;
     }
     if events.iter().any(|e| e.ty == E::UnsplicedIntronRetention) {
         MatchClass::NovelInCatalog
-    } else if events.iter().any(|e| matches!(e.ty, E::IncompleteIntronRetentionLeft | E::IncompleteIntronRetentionRight)) {
+    } else if events
+        .iter()
+        .any(|e| matches!(e.ty, E::IncompleteIntronRetentionLeft | E::IncompleteIntronRetentionRight))
+    {
         MatchClass::Genic
     } else {
         match events.first().map(|e| e.ty) {
@@ -273,7 +291,10 @@ pub(crate) fn inconsistency_classification(events: &[MatchEvent]) -> MatchClass 
 
 /// `classify_assignment` (`:657-681`). `is_ambiguous` = more than one selected isoform;
 /// `events` = the events of all selected isoforms (a set in 4.1; only membership matters).
-pub(crate) fn classify_assignment<'e>(is_ambiguous: bool, events: impl Iterator<Item = &'e MatchEvent> + Clone) -> AssignmentType {
+pub(crate) fn classify_assignment<'e>(
+    is_ambiguous: bool,
+    events: impl Iterator<Item = &'e MatchEvent> + Clone,
+) -> AssignmentType {
     use AssignmentType as A;
     if events.clone().all(|e| e.ty.is_consistent()) {
         if is_ambiguous {
@@ -368,7 +389,13 @@ impl<'a> Assigner<'a> {
 
     /// `IsoformMatch(class, gene=gene_id_map[iso], transcript=iso, events, strand, penalty)`
     /// with a list of events (`none` events filtered out).
-    pub(crate) fn iso_match(&self, class: MatchClass, iso: u32, events: impl IntoIterator<Item = MatchEvent>, penalty: f64) -> IsoformMatch {
+    pub(crate) fn iso_match(
+        &self,
+        class: MatchClass,
+        iso: u32,
+        events: impl IntoIterator<Item = MatchEvent>,
+        penalty: f64,
+    ) -> IsoformMatch {
         let r = &self.index.iso[iso as usize];
         IsoformMatch::new(class, Some(r.gene), Some(r.key), events, r.strand, penalty)
     }
@@ -466,9 +493,16 @@ impl<'a> Assigner<'a> {
 
     /// `resolve_by_nucleotide_score` (`:267-290`) with `min_similarity = -0.5`. Writes the
     /// kept isoforms to `out` (cleared first) sorted by id. `top_scored_factor = 0` keeps all
-    /// isoforms with score ≥ -0.5; otherwise `score * factor >= best` (D-A4: `score >= best`
-    /// when `best < 0`).
-    pub(crate) fn resolve_by_nucleotide_score(&mut self, p: &CombinedProfile, isos: &[u32], kind: NucScore, top_scored_factor: f64, out: &mut Vec<u32>) {
+    /// isoforms with score ≥ -0.5; otherwise `score * factor >= best` (also when `best < 0`,
+    /// as in 4.1).
+    pub(crate) fn resolve_by_nucleotide_score(
+        &mut self,
+        p: &CombinedProfile,
+        isos: &[u32],
+        kind: NucScore,
+        top_scored_factor: f64,
+        out: &mut Vec<u32>,
+    ) {
         out.clear();
         if isos.is_empty() {
             return;
@@ -481,9 +515,9 @@ impl<'a> Assigner<'a> {
         let min_sim = MINIMAL_SCORE;
         if top_scored_factor == 0.0 {
             out.extend(scores.iter().filter(|x| x.1 >= min_sim).map(|x| x.0));
-        } else if best < 0.0 && !quirk(DevId::A4) {
-            out.extend(scores.iter().filter(|x| x.1 >= best && x.1 >= min_sim).map(|x| x.0));
         } else {
+            // Matches IsoQuant 4.1: with a negative best score `score * factor >= best` can drop
+            // every candidate.
             out.extend(scores.iter().filter(|x| x.1 * top_scored_factor >= best && x.1 >= min_sim).map(|x| x.0));
         }
         self.scratch.scores = scores;
@@ -522,8 +556,8 @@ impl<'a> Assigner<'a> {
             i -= 1;
         }
         if common_first == -1 || common_last == -1 {
-            // 4.1 logs "Odd case" and indexes `split_exons[-1]` (D-A3)
-            if !quirk(DevId::A3) || k == 0 {
+            // Matches IsoQuant 4.1: logs "Odd case" and indexes `split_exons[-1]`.
+            if k == 0 {
                 return;
             }
         }
@@ -538,7 +572,11 @@ impl<'a> Assigner<'a> {
             let extra = f.s as i64 - first_read.s as i64;
             if common_first == iso_first {
                 if extra.abs() <= minor {
-                    let t = if extra.abs() <= delta { EventType::TerminalSiteMatchLeftPrecise } else { EventType::TerminalSiteMatchLeft };
+                    let t = if extra.abs() <= delta {
+                        EventType::TerminalSiteMatchLeftPrecise
+                    } else {
+                        EventType::TerminalSiteMatchLeft
+                    };
                     out.push(MatchEvent::with_info(t, extra));
                 }
                 if extra > minor {
@@ -557,7 +595,11 @@ impl<'a> Assigner<'a> {
             let extra = last_read.e as i64 - f.e as i64;
             if common_last == iso_last {
                 if extra.abs() <= minor {
-                    let t = if extra.abs() <= delta { EventType::TerminalSiteMatchRightPrecise } else { EventType::TerminalSiteMatchRight };
+                    let t = if extra.abs() <= delta {
+                        EventType::TerminalSiteMatchRightPrecise
+                    } else {
+                        EventType::TerminalSiteMatchRight
+                    };
                     out.push(MatchEvent::with_info(t, extra));
                 }
                 if extra > minor {
@@ -836,7 +878,6 @@ impl U6Assign {
 impl UnitFixture for U6Assign {
     const UNIT: &'static str = "U6";
     const FN: &'static str = "assign_to_isoform";
-    const DEVIATIONS: &'static [DevId] = &[DevId::A3, DevId::A4];
     type In = U6AssignIn;
     type Out = U6AssignOut;
 
@@ -895,7 +936,7 @@ mod tests {
     }
 
     /// U6 breakdown by call_site × route (early / consistent / inconsistent).
-    /// `cargo test --release -p iq_assign [--features quirks41] u6_breakdown -- --ignored --nocapture`
+    /// `cargo test --release -p iq_assign u6_breakdown -- --ignored --nocapture`
     /// Env: `IQRS_FIXTURES` (default `../fixtures`), `IQRS_U6_CALL_SITE`, `IQRS_U6_ROUTE`
     /// (`early|consistent|inconsistent`, route as computed by *this* code),
     /// `IQRS_U6_ATYPE` (expected atype code), `IQRS_U6_EXAMPLES` (n diffs to print).
@@ -904,7 +945,8 @@ mod tests {
     fn u6_breakdown() {
         use iq_types::fixture::{find_capture_dirs, read_cases, unit_files, Verdict};
         use std::collections::BTreeMap;
-        let root = std::env::var("IQRS_FIXTURES").unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fixtures").into());
+        let root = std::env::var("IQRS_FIXTURES")
+            .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fixtures").into());
         let f_cs = std::env::var("IQRS_U6_CALL_SITE").ok();
         let f_route = std::env::var("IQRS_U6_ROUTE").ok();
         let f_atype: Option<u8> = std::env::var("IQRS_U6_ATYPE").ok().and_then(|v| v.parse().ok());
@@ -916,12 +958,7 @@ mod tests {
         let mut tally: BTreeMap<(String, &str), [u64; 3]> = BTreeMap::new();
         let mut shown = 0;
         for cap in caps {
-            let mut ctx = FixtureCtx::new(&cap);
-            ctx.mode = if iq_types::QUIRKS41 && std::env::var("IQRS_U6_DEFAULT").is_err() {
-                iq_types::fixture::RunMode::Parity
-            } else {
-                iq_types::fixture::RunMode::Default
-            };
+            let ctx = FixtureCtx::new(&cap);
             for f in unit_files(&cap, "U6").unwrap() {
                 for c in read_cases::<U6AssignIn, U6AssignOut>(&f).unwrap() {
                     let c = c.unwrap();
@@ -936,7 +973,8 @@ mod tests {
                     let params = U6Assign::params(i);
                     let mut s = AssignScratch::default();
                     let route = {
-                        let mut a = Assigner { index: &index, params: &params, polya: i.profile.polya, scratch: &mut s };
+                        let mut a =
+                            Assigner { index: &index, params: &params, polya: i.profile.polya, scratch: &mut s };
                         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| a.route(&i.profile))) {
                             Ok(Route::Early(_)) => "early",
                             Ok(Route::Consistent(_)) => "consistent",

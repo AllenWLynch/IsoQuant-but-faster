@@ -49,10 +49,7 @@ pub trait BlockAnnot {
 
 /// `validate_exons` (`transcript_printer.py:19-20`).
 pub fn validate_exons(exons: &[Iv]) -> bool {
-    exons
-        .windows(2)
-        .all(|w| (w[0].s, w[0].e) <= (w[1].s, w[1].e))
-        && exons.iter().all(|x| 0 < x.s && x.s <= x.e)
+    exons.windows(2).all(|w| (w[0].s, w[0].e) <= (w[1].s, w[1].e)) && exons.iter().all(|x| 0 < x.s && x.s <= x.e)
 }
 
 /// Per-chromosome GTF printer state.
@@ -65,20 +62,11 @@ pub struct GtfChrWriter {
 
 impl GtfChrWriter {
     pub fn new(chr: &str) -> Self {
-        GtfChrWriter {
-            chr: chr.to_owned(),
-            printed_gene_ids: FxHashSet::default(),
-            exon_ids: ExonIds::new(),
-        }
+        GtfChrWriter { chr: chr.to_owned(), printed_gene_ids: FxHashSet::default(), exon_ids: ExonIds::new() }
     }
 
     /// `GFFPrinter.dump(gene_info, storage)`: appends the block's lines to `out`.
-    pub fn dump_block(
-        &mut self,
-        annot: &impl BlockAnnot,
-        models: &[PrintModel<'_>],
-        out: &mut String,
-    ) {
+    pub fn dump_block(&mut self, annot: &impl BlockAnnot, models: &[PrintModel<'_>], out: &mut String) {
         if models.is_empty() {
             return;
         }
@@ -103,12 +91,7 @@ impl GtfChrWriter {
                         None => tr,
                     };
                     gpos.insert(m.gid.as_ref(), genes.len());
-                    genes.push(G {
-                        first: i,
-                        strand: m.strand,
-                        region,
-                        models: vec![i],
-                    });
+                    genes.push(G { first: i, strand: m.strand, region, models: vec![i] });
                 }
                 Some(&k) => {
                     let g = &mut genes[k];
@@ -266,19 +249,13 @@ impl BlockAnnot for AnnotBlock<'_> {
             return None;
         }
         let key = self.models[i].gene;
-        self.index
-            .genes
-            .iter()
-            .find(|g| g.key == key)
-            .map(|g| g.region)
+        self.index.genes.iter().find(|g| g.key == key).map(|g| g.region)
     }
     fn gene_source(&self, i: usize) -> Option<Cow<'_, str>> {
-        self.ref_gene(i)
-            .map(|g| Cow::Borrowed(self.ann.gene_source(g)))
+        self.ref_gene(i).map(|g| Cow::Borrowed(self.ann.gene_source(g)))
     }
     fn gene_attrs(&self, i: usize) -> Option<Cow<'_, str>> {
-        self.ref_gene(i)
-            .and_then(|g| non_empty(self.ann.gene_attrs(g)))
+        self.ref_gene(i).and_then(|g| non_empty(self.ann.gene_attrs(g)))
     }
     fn tx_attrs(&self, i: usize) -> Option<Cow<'_, str>> {
         self.known(i).and_then(|t| non_empty(self.ann.tx_attrs(t)))
@@ -291,15 +268,12 @@ impl BlockAnnot for AnnotBlock<'_> {
             return false;
         }
         let g = self.ann.tx_gene(t);
-        self.ann.gene_txs(g).any(|u| {
-            self.ann.tx_strand(u) == strand
-                && self.ann.tx_exons(u).iter().any(|x| x.s == s && x.e == e)
-        })
+        self.ann
+            .gene_txs(g)
+            .any(|u| self.ann.tx_strand(u) == strand && self.ann.tx_exons(u).iter().any(|x| x.s == s && x.e == e))
     }
     fn annotated_exon_id(&self, s: Pos, e: Pos, strand: Strand) -> Option<Cow<'_, str>> {
-        self.chr
-            .and_then(|c| self.ann.exon_id(c, Iv::new(s, e), strand))
-            .map(Cow::Borrowed)
+        self.chr.and_then(|c| self.ann.exon_id(c, Iv::new(s, e), strand)).map(Cow::Borrowed)
     }
 }
 
@@ -317,9 +291,7 @@ pub fn print_models<'a>(
             let (source, other) = match m.kind {
                 ModelKind::Known(t) => (
                     Cow::Borrowed(ann.tx_source(t)),
-                    ann.tx_other_features(t)
-                        .map(|(iv, ty)| (iv.s, iv.e, Cow::Borrowed(ty)))
-                        .collect(),
+                    ann.tx_other_features(t).map(|(iv, ty)| (iv.s, iv.e, Cow::Borrowed(ty))).collect(),
                 ),
                 _ => (Cow::Borrowed("IsoQuant"), Vec::new()),
             };
@@ -383,23 +355,19 @@ mod tests {
             pm("bad", "g1", Strand::Plus, &[(50, 20)]),
         ];
         let mut out = String::new();
-        iq_types::with_quirks(iq_types::QuirkSet::NONE, || {
-            w.dump_block(&NoAnnot, &ms, &mut out)
-        });
+        w.dump_block(&NoAnnot, &ms, &mut out);
         let want = "8\tIsoQuant\tgene\t100\t200\t.\t+\t.\tgene_id \"g1\"; transcripts \"1\"; \n\
 8\tIsoQuant\ttranscript\t100\t200\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; exons \"1\";\n\
-8\tIsoQuant\texon\t100\t200\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; exon_number \"1\"; exon_id \"8.1\"; \n\
+8\tIsoQuant\texon\t100\t200\t.\t+\t.\tgene_id \"g1\"; transcript_id \"t1\"; exon_number \"1\"; exon_id \"1\"; \n\
 8\tIsoQuant\tgene\t300\t600\t.\t-\t.\tgene_id \"g2\"; transcripts \"1\"; \n\
 8\tIsoQuant\ttranscript\t300\t600\t.\t-\t.\tgene_id \"g2\"; transcript_id \"t2\"; exons \"2\";\n\
-8\tIsoQuant\texon\t500\t600\t.\t-\t.\tgene_id \"g2\"; transcript_id \"t2\"; exon_number \"1\"; exon_id \"8.2\"; \n\
-8\tIsoQuant\texon\t300\t400\t.\t-\t.\tgene_id \"g2\"; transcript_id \"t2\"; exon_number \"2\"; exon_id \"8.3\"; \n";
+8\tIsoQuant\texon\t500\t600\t.\t-\t.\tgene_id \"g2\"; transcript_id \"t2\"; exon_number \"1\"; exon_id \"2\"; \n\
+8\tIsoQuant\texon\t300\t400\t.\t-\t.\tgene_id \"g2\"; transcript_id \"t2\"; exon_number \"2\"; exon_id \"3\"; \n";
         assert_eq!(out, want);
         // a second block: genes already printed are not repeated; exon ids are reused
         let mut out2 = String::new();
         let ms2 = vec![pm("t3", "g1", Strand::Plus, &[(100, 200)])];
-        iq_types::with_quirks(iq_types::QuirkSet::NONE, || {
-            w.dump_block(&NoAnnot, &ms2, &mut out2)
-        });
+        w.dump_block(&NoAnnot, &ms2, &mut out2);
         assert!(!out2.contains("\tgene\t"));
         assert!(out2.contains("exon_id \"8.1\""));
     }

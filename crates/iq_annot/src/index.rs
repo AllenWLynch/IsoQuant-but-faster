@@ -14,18 +14,17 @@
 
 use crate::attrs;
 use iq_types::smallvec::SmallVec;
-use iq_types::{quirk, ChrIdx, DevId, GeneIdx, Iv, Iv0, Pos, Strand, TxIdx};
+use iq_types::{ChrIdx, GeneIdx, Iv, Iv0, Pos, Strand, TxIdx};
 use std::collections::HashMap;
 
-/// Gene selection mode (design §4.2, D-A1).
+/// Gene selection mode (`--gene-types`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub enum GeneTypes {
     /// Every parentless feature with transcript children that have exon/CDS children
-    /// (default; deviation D-A1).
-    #[default]
+    /// (opt-in; not validated against IsoQuant 4.1).
     All,
-    /// 4.1 behaviour: type exactly `gene`, transcripts of `DEFAULT_RNA_TYPES`. Used for
-    /// fixtures and parity runs.
+    /// IsoQuant 4.1 behaviour (default): type exactly `gene`, transcripts of `DEFAULT_RNA_TYPES`.
+    #[default]
     Isoquant,
 }
 
@@ -159,22 +158,18 @@ impl AnnotationIndex {
     /// 0-based closed): the gene query of `get_gene_info_for_region` /
     /// `get_genes_in_region` (`alignment_processor.py:583-605`).
     ///
-    /// D-R1 lives here: iqrs converts the region to 1-based (`s+1, e+1`); 4.1 passed the
-    /// 0-based tuple to gffutils unchanged (and gffutils treats `start == 0` as "no start
-    /// bound", leaving the strict test `gene.start < end`).
+    /// Matches IsoQuant 4.1: the 0-based tuple is passed to gffutils unchanged (a 1-bp shift),
+    /// and gffutils treats `start == 0` as "no start bound", leaving the strict test
+    /// `gene.start < end`.
     pub fn genes_for_region0(&self, chr: ChrIdx, r: Iv0) -> SmallVec<[GeneIdx; 4]> {
-        if quirk(DevId::R1) {
-            if r.s == 0 {
-                // gffutils `region()`: falsy start → only `start < end` (interface.py:752-767)
-                let range = self.chrom_genes(chr);
-                let lo = range.start as usize;
-                let n = self.genes[lo..range.end as usize].partition_point(|g| (g.iv.s as i64) < r.e);
-                return (lo..lo + n).map(|g| g as GeneIdx).collect();
-            }
-            self.genes_overlapping(chr, Iv::new(r.s as Pos, r.e as Pos))
-        } else {
-            self.genes_overlapping(chr, Iv::new((r.s + 1) as Pos, (r.e + 1) as Pos))
+        if r.s == 0 {
+            // gffutils `region()`: falsy start → only `start < end` (interface.py:752-767)
+            let range = self.chrom_genes(chr);
+            let lo = range.start as usize;
+            let n = self.genes[lo..range.end as usize].partition_point(|g| (g.iv.s as i64) < r.e);
+            return (lo..lo + n).map(|g| g as GeneIdx).collect();
         }
+        self.genes_overlapping(chr, Iv::new(r.s as Pos, r.e as Pos))
     }
 
     pub fn gene_id(&self, g: GeneIdx) -> &str {
@@ -296,7 +291,6 @@ impl AnnotationIndex {
 mod tests {
     use super::*;
     use crate::parse::parse_gff3_reader;
-    use iq_types::{with_quirks, QuirkSet, QUIRKS41};
 
     const GFF: &str = "1\ts\tgene\t100\t900\t.\t+\t.\tID=A\n1\ts\tgene\t50\t60\t.\t+\t.\tID=B\n\
                        1\ts\tgene\t100\t200\t.\t-\t.\tID=C\n1\ts\tgene\t5000\t6000\t.\t+\t.\tID=D\n";
@@ -316,25 +310,16 @@ mod tests {
         assert!(a.genes_overlapping(1, Iv::new(1, 10)).is_empty());
     }
 
-    /// D-R1: 4.1 queries gffutils with the 0-based tuple; iqrs converts to 1-based.
+    /// 4.1 queries gffutils with the 0-based tuple (1-bp shift, falsy start).
     #[test]
-    fn d_r1_region_shift() {
+    fn region0_matches_gffutils() {
         let a = parse_gff3_reader(GFF.as_bytes(), GeneTypes::Isoquant).unwrap();
         let q = |r: Iv0| ids(&a, &a.genes_for_region0(0, r));
-        // 0-based [900, 950] = 1-based [901, 951]: A ends at 900
-        assert!(with_quirks(QuirkSet::NONE, || q(Iv0 { s: 900, e: 950 })).is_empty());
-        // 0-based [4998, 4998] = 1-based 4999: D starts at 5000
-        assert!(with_quirks(QuirkSet::NONE, || q(Iv0 { s: 4998, e: 4998 })).is_empty());
-        assert_eq!(with_quirks(QuirkSet::NONE, || q(Iv0 { s: 4999, e: 4999 })), ["D"]);
-        assert_eq!(with_quirks(QuirkSet::NONE, || q(Iv0 { s: 0, e: 99 })), ["B", "A", "C"]);
-        if QUIRKS41 {
-            let r1 = QuirkSet::only(DevId::R1);
-            assert_eq!(with_quirks(r1, || q(Iv0 { s: 900, e: 950 })), ["A"]);
-            assert_eq!(with_quirks(r1, || q(Iv0 { s: 4998, e: 4999 })), Vec::<String>::new());
-            assert_eq!(with_quirks(r1, || q(Iv0 { s: 4999, e: 4999 })), Vec::<String>::new());
-            assert_eq!(with_quirks(r1, || q(Iv0 { s: 5000, e: 5000 })), ["D"]);
-            // gffutils falsy start: only `start < end`
-            assert_eq!(with_quirks(r1, || q(Iv0 { s: 0, e: 100 })), ["B"]);
-        }
+        assert_eq!(q(Iv0 { s: 900, e: 950 }), ["A"]);
+        assert_eq!(q(Iv0 { s: 4998, e: 4999 }), Vec::<String>::new());
+        assert_eq!(q(Iv0 { s: 4999, e: 4999 }), Vec::<String>::new());
+        assert_eq!(q(Iv0 { s: 5000, e: 5000 }), ["D"]);
+        // gffutils falsy start: only `start < end`
+        assert_eq!(q(Iv0 { s: 0, e: 100 }), ["B"]);
     }
 }

@@ -7,9 +7,6 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[features]
-quirks41 = ["iq_types/quirks41"]
-
 [dependencies]
 iq_types.workspace = true
 

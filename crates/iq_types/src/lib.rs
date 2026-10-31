@@ -14,7 +14,6 @@
 //! | [`model`] | §2.5-2.6 | `Vertex`, `IntronGraph`, `PathStorage`, `TranscriptModel`, `ModelStore` |
 //! | [`intern`] | §1.2 | `Interner`, `GroupPool` |
 //! | [`params`] | §7.0 | `Params` and the two built-in presets |
-//! | [`dev`] | §9, §3.0 | `DevId`, `quirk()` switches (`quirks41` feature) |
 //! | [`fixture`] | §3.0 | fixture IO, schema DTOs, `UnitFixture`, `Verdict`, diff, registry |
 //!
 //! Conventions: genomic coordinates are 1-based closed (`Iv`); maps whose order can reach an
@@ -27,7 +26,6 @@
 //! impl UnitFixture for U6Assign {
 //!     const UNIT: &'static str = "U6";
 //!     const FN: &'static str = "assign_to_isoform";          // = in.fn
-//!     const DEVIATIONS: &'static [iq_types::DevId] = &[iq_types::DevId::A3, iq_types::DevId::A4];
 //!     type In = U6AssignIn;
 //!     type Out = U6AssignOut;
 //!     fn run(i: &U6AssignIn, ctx: &FixtureCtx) -> FixResult<U6AssignOut> {
@@ -38,13 +36,10 @@
 //! }
 //! // in your crate:  pub fn register_fixtures(reg: &mut Registry) { reg.add::<U6Assign>(); }
 //! ```
-//! Then `cargo run -p iqrs-fixture --features quirks41 -- run U6 fixtures/` (parity) or
-//! `-- run U6 fixtures/ --mode default` (attribution). Compare in fixture (string) space;
-//! override `UnitFixture::compare` for set semantics or tolerances (`DiffOptions`).
-//! 4.1 quirks go behind `if iq_types::quirk(DevId::X) { 4.1 } else { iqrs }` at one site.
+//! Then `cargo run --release -p iqrs-fixture -- run U6 fixtures/`. Compare in fixture (string)
+//! space; override `UnitFixture::compare` for set semantics or tolerances (`DiffOptions`).
 
 pub mod assign;
-pub mod dev;
 pub mod enums;
 pub mod fixture;
 pub mod index;
@@ -56,7 +51,6 @@ pub mod read;
 pub mod store;
 
 pub use assign::{derive_gene_atype, Assignment, Events, GeneKey, IsoRef, IsoformMatch, MatchEvent, Matches};
-pub use dev::{current_quirks, quirk, with_quirks, DevId, QuirkSet, QUIRKS41};
 pub use enums::{
     elongation_cost, match_consts, AmbiguityResolving, AssignmentType, EventType, MatchClass, MultimapStrategy,
     PolyATrimmed, PolyAUsage, StrandnessReporting, TranscriptModelType, ABSENT_POSITION,

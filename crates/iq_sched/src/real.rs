@@ -17,7 +17,9 @@ use iq_collect::{BlockCollector, ClusterOwner, CollectStats, GroupIds, NoGroups,
 use iq_model::DetectedKnown;
 use iq_quant::{BlockOutput, ChrOutput, ChrPhaseW, OutputSpec, TxCounter};
 use iq_regions::{GeneOracle, PassA, PassAConfig};
-use iq_types::{Block, BlockStore, ChrIdx, GeneIdx, IsoformIndex, Iv, Iv0, Params, PolyAUsage, RefSlice, TranscriptModel};
+use iq_types::{
+    Block, BlockStore, ChrIdx, GeneIdx, IsoformIndex, Iv, Iv0, Params, PolyAUsage, RefSlice, TranscriptModel,
+};
 use std::sync::Mutex;
 
 /// Bases added on each side of a cluster region for the reference window of its blocks.
@@ -216,9 +218,20 @@ impl Pipeline for RealPipeline {
         let region = Iv0 { s: 0, e: c.len as i64 - 1 };
         let it = iq_bam::try_fetch(&self.bam_passa, &c.name, region, FetchOpts { seq: false, batch_records: 4096 })
             .map_err(err(&c.name))?;
+        let mut last_pos0 = i64::MIN;
         for b in it {
             let b = b.map_err(err(&c.name))?;
             for r in b.iter() {
+                if r.pos0 < last_pos0 {
+                    return Err(format!(
+                        "{}: records out of order on {} near position {}; the BAM must be coordinate-sorted \
+                         (`samtools sort` then `samtools index`)",
+                        self.cfg.bam.display(),
+                        c.name,
+                        last_pos0 + 1
+                    ));
+                }
+                last_pos0 = r.pos0;
                 pa.push_lite(&r);
             }
         }

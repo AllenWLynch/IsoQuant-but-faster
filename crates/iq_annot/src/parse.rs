@@ -30,8 +30,19 @@ impl std::error::Error for AnnotError {}
 
 /// 4.1 `GeneInfo.DEFAULT_RNA_TYPES` (`gene_info.py:230-231`).
 pub const DEFAULT_RNA_TYPES: &[&str] = &[
-    "transcript", "RNA", "mRNA", "miRNA", "ncRNA", "tRNA", "rRNA", "snRNA", "lnc_RNA", "snoRNA",
-    "telomerase_RNA", "Y_RNA", "scRNA",
+    "transcript",
+    "RNA",
+    "mRNA",
+    "miRNA",
+    "ncRNA",
+    "tRNA",
+    "rRNA",
+    "snRNA",
+    "lnc_RNA",
+    "snoRNA",
+    "telomerase_RNA",
+    "Y_RNA",
+    "scRNA",
 ];
 /// 4.1 `GeneInfo.OTHER_FEATURES` (`gene_info.py:229`; exact type match, so Ensembl's
 /// `five_prime_UTR`/`three_prime_UTR` are not included).
@@ -127,7 +138,8 @@ impl Interner {
         if let Some(&i) = self.map.get(s) {
             return Ok(i);
         }
-        let i = u16::try_from(self.names.len()).map_err(|_| AnnotError("too many distinct types/sources/chromosomes".into()))?;
+        let i = u16::try_from(self.names.len())
+            .map_err(|_| AnnotError("too many distinct types/sources/chromosomes".into()))?;
         self.names.push(s.to_owned());
         self.map.insert(s.to_owned(), i);
         Ok(i)
@@ -270,7 +282,15 @@ impl Raw {
         }
     }
 
-    fn gff3_row(&mut self, seqid: &str, source: &str, ty: &str, iv: Iv, strand: Strand, attr: &str) -> Result<(), AnnotError> {
+    fn gff3_row(
+        &mut self,
+        seqid: &str,
+        source: &str,
+        ty: &str,
+        iv: Iv,
+        strand: Strand,
+        attr: &str,
+    ) -> Result<(), AnnotError> {
         let parents = attrs::attr_values(attr, "Parent");
         let id = attrs::attr_first(attr, "ID");
         let tyi = self.types.get(ty)?;
@@ -336,7 +356,15 @@ impl Raw {
 
     /// GTF row (§4.4): `gene_id`/`transcript_id` attributes; gene and transcript rows are
     /// used when present, otherwise synthesized from their children's spans.
-    fn gtf_row(&mut self, seqid: &str, source: &str, ty: &str, iv: Iv, strand: Strand, attr: &str) -> Result<(), AnnotError> {
+    fn gtf_row(
+        &mut self,
+        seqid: &str,
+        source: &str,
+        ty: &str,
+        iv: Iv,
+        strand: Strand,
+        attr: &str,
+    ) -> Result<(), AnnotError> {
         let kv = gtf_attributes(attr);
         let get = |k: &str| kv.iter().find(|(kk, _)| kk == k).map(|(_, v)| v.clone());
         let gid = get("gene_id");
@@ -380,7 +408,17 @@ impl Raw {
             let a = if explicit { as_gff3(&[("ID", &gid)]) } else { format!("ID={}", gff3_escape(&gid)) };
             let ar = this.push_str(&a);
             let tyi = this.types.get("gene")?;
-            this.feats.push(Feat { chr, iv, strand, ty: tyi, source: src, id: idr, attrs: ar, has_parent: false, db_id: DbId::Attr(idr) });
+            this.feats.push(Feat {
+                chr,
+                iv,
+                strand,
+                ty: tyi,
+                source: src,
+                id: idr,
+                attrs: ar,
+                has_parent: false,
+                db_id: DbId::Attr(idr),
+            });
             this.gtf_genes.insert(gid.clone(), row);
             Ok(row)
         };
@@ -415,7 +453,17 @@ impl Raw {
                 };
                 let ar = self.push_str(&a);
                 let tyi = self.types.get("transcript")?;
-                self.feats.push(Feat { chr, iv, strand, ty: tyi, source: src, id: idr, attrs: ar, has_parent: true, db_id: DbId::Attr(idr) });
+                self.feats.push(Feat {
+                    chr,
+                    iv,
+                    strand,
+                    ty: tyi,
+                    source: src,
+                    id: idr,
+                    attrs: ar,
+                    has_parent: true,
+                    db_id: DbId::Attr(idr),
+                });
                 self.gtf_txs.insert(tid.clone(), row);
                 self.feat_links.push((row, g));
                 row
@@ -515,7 +563,9 @@ impl Raw {
                 let id = self.s(self.feats[d as usize].id);
                 let first = self.id_map[id].feat;
                 let is_gt = |r: u32| {
-                    used[r as usize] || Some(self.feats[r as usize].ty) == ty_gene || rna_tys.contains(&self.feats[r as usize].ty)
+                    used[r as usize]
+                        || Some(self.feats[r as usize].ty) == ty_gene
+                        || rna_tys.contains(&self.feats[r as usize].ty)
                 };
                 if is_gt(d) || is_gt(first) {
                     return Err(AnnotError(format!("duplicate gene/transcript ID {id:?} in annotation")));
@@ -613,7 +663,9 @@ impl Raw {
         for f in &self.feats {
             let id = self.s(f.id);
             if Some(f.ty) == ty_gene {
-                if let Some(n) = id.strip_prefix("novel_gene_").and_then(|_| py_int(id.rsplit('_').next().unwrap_or(""))) {
+                if let Some(n) =
+                    id.strip_prefix("novel_gene_").and_then(|_| py_int(id.rsplit('_').next().unwrap_or("")))
+                {
                     forbidden[f.chr as usize].push(n);
                 }
             }
@@ -709,7 +761,12 @@ pub fn cds_as_exon(feats: &[(Iv, bool, u32)], out: &mut Vec<Iv>) {
 fn py_int(s: &str) -> Option<u64> {
     let t = s.trim();
     let t = t.strip_prefix('+').unwrap_or(t);
-    if t.is_empty() || !t.bytes().all(|b| b.is_ascii_digit() || b == b'_') || t.starts_with('_') || t.ends_with('_') || t.contains("__") {
+    if t.is_empty()
+        || !t.bytes().all(|b| b.is_ascii_digit() || b == b'_')
+        || t.starts_with('_')
+        || t.ends_with('_')
+        || t.contains("__")
+    {
         return None;
     }
     t.replace('_', "").parse().ok()

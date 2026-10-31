@@ -14,7 +14,10 @@ pub mod htslib;
 #[cfg(feature = "htslib")]
 pub use htslib::HtsBam;
 
-pub use bam::{decode_seq_into, fetch, fetch_with, try_fetch, BamHandle, BamOptions, FetchIter, FetchOpts, RecordBatch, RecordSource};
+pub use bam::{
+    decode_seq_into, fetch, fetch_with, try_fetch, BamHandle, BamOptions, FetchIter, FetchOpts, RecordBatch,
+    RecordSource,
+};
 pub use fasta::FastaIndex;
 
 /// Registers this crate's fixture runners.
@@ -24,7 +27,7 @@ pub fn register_fixtures(reg: &mut iq_types::fixture::Registry) {
 
 #[cfg(test)]
 mod fixture_tests {
-    use iq_types::fixture::{run_path, Registry, RunMode, Summary};
+    use iq_types::fixture::{run_path, Registry, Summary};
     use std::path::PathBuf;
 
     /// Runs the U2 fixtures (`$IQRS_FIXTURES` or `../fixtures`) when they exist.
@@ -39,11 +42,10 @@ mod fixture_tests {
         let mut reg = Registry::new();
         super::register_fixtures(&mut reg);
         let mut s = Summary::new(5);
-        let mode = if iq_types::QUIRKS41 { RunMode::Parity } else { RunMode::Default };
         for e in std::fs::read_dir(&root).unwrap() {
             let u2 = e.unwrap().path().join("u2");
             if u2.is_dir() {
-                run_path(&reg, "U2", &u2, mode, &mut s).unwrap();
+                run_path(&reg, "U2", &u2, &mut s).unwrap();
             }
         }
         eprintln!("{s}");

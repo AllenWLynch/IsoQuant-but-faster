@@ -113,9 +113,7 @@ fn pack(blocks: &[Block], legal: Vec<Range<usize>>, target: u64) -> Vec<Range<us
     for r in legal {
         let n = reads(&r);
         cur = match cur {
-            Some((c, cn)) if cn + n <= target && (r.end - c.start) <= PACK_MAX_BLOCKS => {
-                Some((c.start..r.end, cn + n))
-            }
+            Some((c, cn)) if cn + n <= target && (r.end - c.start) <= PACK_MAX_BLOCKS => Some((c.start..r.end, cn + n)),
             Some((c, _)) => {
                 out.push(c);
                 Some((r, n))

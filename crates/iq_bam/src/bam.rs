@@ -71,12 +71,26 @@ impl BamHandle {
     }
 
     pub fn open_with(path: &Path, opts: BamOptions) -> io::Result<BamHandle> {
-        let (refs, ref_lens) = read_header(path)?;
+        let (refs, ref_lens, sort_order) = read_header(path)?;
+        if let Some(so) = sort_order.filter(|so| so == "queryname" || so == "unsorted") {
+            return Err(invalid(format!(
+                "BAM is not coordinate-sorted (@HD SO:{so}); sort it with `samtools sort` and index it with `samtools index`"
+            )));
+        }
         let mut bai = PathBuf::from(format!("{}.bai", path.display()));
         if !bai.exists() {
             let alt = path.with_extension("bai");
             if alt.exists() {
                 bai = alt;
+            } else {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        "BAM index not found (looked for {} and {}); create it with `samtools index` (a .bai index is required; .csi is not supported)",
+                        bai.display(),
+                        alt.display()
+                    ),
+                ));
             }
         }
         let index = noodles_bam::bai::fs::read(&bai)
@@ -151,7 +165,8 @@ fn invalid(msg: impl Into<String>) -> io::Error {
 }
 
 /// Reads the BAM header: reference names and lengths.
-fn read_header(path: &Path) -> io::Result<(Vec<String>, Vec<u64>)> {
+/// Reference names and lengths, and the `@HD SO:` value of the header text if present.
+fn read_header(path: &Path) -> io::Result<(Vec<String>, Vec<u64>, Option<String>)> {
     let f = File::open(path).map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", path.display())))?;
     let mut r = bgzf::io::Reader::new(f);
     let mut magic = [0u8; 4];
@@ -160,7 +175,12 @@ fn read_header(path: &Path) -> io::Result<(Vec<String>, Vec<u64>)> {
         return Err(invalid(format!("{}: not a BAM file", path.display())));
     }
     let l_text = read_u32(&mut r)? as u64;
-    io::copy(&mut (&mut r).take(l_text), &mut io::sink())?;
+    let mut text = Vec::new();
+    (&mut r).take(l_text).read_to_end(&mut text)?;
+    let sort_order = String::from_utf8_lossy(&text)
+        .lines()
+        .find(|l| l.starts_with("@HD"))
+        .and_then(|l| l.split('\t').find_map(|f| f.strip_prefix("SO:")).map(str::to_owned));
     let n_ref = read_u32(&mut r)? as usize;
     let mut refs = Vec::with_capacity(n_ref);
     let mut lens = Vec::with_capacity(n_ref);
@@ -175,7 +195,7 @@ fn read_header(path: &Path) -> io::Result<(Vec<String>, Vec<u64>)> {
         refs.push(String::from_utf8(buf.clone()).map_err(|_| invalid("non-UTF-8 reference name"))?);
         lens.push(read_u32(&mut r)? as u64);
     }
-    Ok((refs, lens))
+    Ok((refs, lens, sort_order))
 }
 
 fn read_u32<R: Read>(r: &mut R) -> io::Result<u32> {
@@ -729,7 +749,8 @@ pub(crate) fn half_open(region: Iv0) -> (i64, i64) {
 
 /// Region query with explicit options. Errors: unknown reference, I/O.
 pub fn try_fetch(bam: &BamHandle, chr: &str, region: Iv0, opts: FetchOpts) -> io::Result<FetchIter> {
-    let tid = bam.ref_id(chr).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("unknown reference {chr:?}")))?;
+    let tid =
+        bam.ref_id(chr).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("unknown reference {chr:?}")))?;
     let (beg, end) = half_open(region);
     let chunks = if beg < end { bam.chunks(tid, beg, end) } else { Vec::new() };
     let reader = if chunks.is_empty() {
@@ -768,7 +789,12 @@ pub fn fetch<'a>(bam: &'a BamHandle, chr: &str, region: Iv0) -> impl Iterator<It
 }
 
 /// [`fetch`] with options (e.g. no sequences for pass A).
-pub fn fetch_with<'a>(bam: &'a BamHandle, chr: &str, region: Iv0, opts: FetchOpts) -> impl Iterator<Item = RecordBatch> + 'a {
+pub fn fetch_with<'a>(
+    bam: &'a BamHandle,
+    chr: &str,
+    region: Iv0,
+    opts: FetchOpts,
+) -> impl Iterator<Item = RecordBatch> + 'a {
     let it = match try_fetch(bam, chr, region, opts) {
         Ok(it) => Some(it),
         Err(e) if e.kind() == io::ErrorKind::NotFound => None,

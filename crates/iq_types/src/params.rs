@@ -515,8 +515,7 @@ mod tests {
         assert_eq!(p.matching.delta, 7);
         assert_eq!(p.report_canonical, StrandnessReporting::OnlyCanonical);
         assert_eq!(p.model.graph_clustering_distance, 20);
-        let q = Params::from_params_json(serde_json::json!({"resolve_ambiguous": "all"}).as_object().unwrap())
-            .unwrap();
+        let q = Params::from_params_json(serde_json::json!({"resolve_ambiguous": "all"}).as_object().unwrap()).unwrap();
         assert_eq!(q.matching.resolve_ambiguous, AmbiguityResolving::All);
     }
 

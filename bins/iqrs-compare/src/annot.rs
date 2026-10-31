@@ -6,7 +6,7 @@
 //!   `novel_mono` (unmatched mono-exon).
 //! - Locus category: the GFF3 type of the model's gene when its `gene_id` is an annotated gene,
 //!   else of overlapping same-strand genes (preferring type `gene`), else `intergenic`. Types other
-//!   than `gene` (ncRNA_gene, pseudogene, ...) are the D-A1 categories.
+//!   than `gene` (ncRNA_gene, pseudogene, ...) are the non-`gene` categories.
 //!
 //! The annotation is parsed with `GeneTypes::All` so every gene type is visible.
 
@@ -24,7 +24,11 @@ pub fn load(p: &Path) -> Result<AnnotationIndex> {
     let name = p.to_string_lossy();
     let gtf = name.ends_with(".gtf") || name.ends_with(".gtf.gz");
     let r = crate::io::open(p)?;
-    let idx = if gtf { iq_annot::parse_gtf_reader(r, GeneTypes::All) } else { iq_annot::parse_gff3_reader(r, GeneTypes::All) };
+    let idx = if gtf {
+        iq_annot::parse_gtf_reader(r, GeneTypes::All)
+    } else {
+        iq_annot::parse_gff3_reader(r, GeneTypes::All)
+    };
     idx.map_err(|e| anyhow::anyhow!("{e:?}")).with_context(|| format!("parsing annotation {}", p.display()))
 }
 

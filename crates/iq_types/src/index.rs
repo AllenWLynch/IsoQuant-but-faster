@@ -67,8 +67,7 @@ impl SortedSpans {
         let hi = self.starts.partition_point(|&s| s <= q.e);
         // first position whose prefix max end >= q.s
         let lo = self.prefix_max_end[..hi].partition_point(|&e| e < q.s);
-        let mut out: Vec<u32> =
-            self.order[lo..hi].iter().copied().filter(|&i| spans[i as usize].e >= q.s).collect();
+        let mut out: Vec<u32> = self.order[lo..hi].iter().copied().filter(|&i| spans[i as usize].e >= q.s).collect();
         out.sort_unstable();
         out
     }

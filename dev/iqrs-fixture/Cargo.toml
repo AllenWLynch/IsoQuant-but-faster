@@ -1,0 +1,26 @@
+[package]
+name = "iqrs-fixture"
+description = "Developer tool: runs unit fixture runners against IsoQuant 4.1 golden fixtures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+iq_types.workspace = true
+iq_annot.workspace = true
+iq_bam.workspace = true
+iq_regions.workspace = true
+iq_read.workspace = true
+iq_assign.workspace = true
+iq_collect.workspace = true
+iq_terminal.workspace = true
+iq_graph.workspace = true
+iq_model.workspace = true
+iq_quant.workspace = true
+lexopt.workspace = true
+anyhow.workspace = true
+
+[lints]
+workspace = true

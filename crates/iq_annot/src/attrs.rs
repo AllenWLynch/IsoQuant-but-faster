@@ -148,7 +148,10 @@ mod tests {
         assert_eq!(a[4], ("flag".into(), vec![]));
         assert_eq!(attr_first(raw, "ID").as_deref(), Some("gene:X"));
         assert_eq!(attr_values(raw, "Alias"), vec!["A".to_string(), "B".into()]);
-        assert_eq!(format_attrs(&a, GENE_SKIP), "Alias \"A\"; description \"kinase, subunit 1 [Source:x;Acc:1]\"; k \"a=b\"; ");
+        assert_eq!(
+            format_attrs(&a, GENE_SKIP),
+            "Alias \"A\"; description \"kinase, subunit 1 [Source:x;Acc:1]\"; k \"a=b\"; "
+        );
     }
 
     #[test]

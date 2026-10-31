@@ -53,6 +53,23 @@ pub struct Config {
     pub split: SplitMode,
     /// Command line for the GTF header.
     pub cmd_line: String,
+    /// Hidden dev option `--emit-read-assignments FILE`: per-read final model assignments
+    /// (TSV). Off by default; does not affect any other output.
+    pub emit_read_assignments: Option<PathBuf>,
+    /// Optional phased quantification (`--phase-vcf` and friends); `None` = off.
+    pub phase: Option<PhaseConfig>,
+}
+
+/// Settings of the optional phasing step.
+#[derive(Clone, Debug)]
+pub struct PhaseConfig {
+    /// Phased VCF (bgzipped or plain).
+    pub vcf: PathBuf,
+    /// Sample column (`None` = the only sample).
+    pub sample: Option<String>,
+    pub burnin: u32,
+    pub sweeps: u32,
+    pub seed: u64,
 }
 
 /// Runs the whole pipeline.

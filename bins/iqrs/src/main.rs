@@ -2,10 +2,11 @@
 //! for bulk long-read RNA-seq (one coordinate-sorted, indexed BAM; PacBio or ONT).
 //!
 //! Run `iqrs --help` for usage. Hidden options (tests only): `--params-json FILE` (full IsoQuant
-//! parameter dump instead of the built-in preset); env `IQRS_DEBUG_UNIT_SPLIT=whole-chr|max`
+//! parameter dump instead of the built-in preset); `--emit-read-assignments FILE` (dev: per-read
+//! final model assignments as TSV); env `IQRS_DEBUG_UNIT_SPLIT=whole-chr|max`
 //! forces the work-unit split (outputs never depend on it).
 
-use iq_sched::{Config, SplitMode};
+use iq_sched::{Config, PhaseConfig, SplitMode};
 use iq_types::DataType;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -52,6 +53,16 @@ OPTIONS:
     --max-mem GIB              Soft memory budget for scheduling work [default: 85% of the
                                smaller of the cgroup limit and available memory]
     --profile                  Print per-phase wall/CPU time and peak memory to stderr
+
+PHASED QUANTIFICATION (optional; off unless --phase-vcf is given):
+    --phase-vcf FILE           Phased VCF (bgzipped or plain; GT with |). Turns on allele-specific
+                               transcript quantification: het SNV evidence is read in the same BAM
+                               pass and a Bayesian model splits each transcript's reads between
+                               haplotype A (first GT allele) and B. Other outputs are unchanged.
+    --phase-sample NAME        VCF sample column [default: the only sample]
+    --phase-sweeps N           Kept Gibbs sweeps per gene [default: 1000]
+    --phase-burnin N           Burn-in sweeps per gene [default: 200]
+    --phase-seed N             Random seed [default: 1]; results do not depend on --threads
     -v, --verbose              Log progress and scheduling decisions to stderr
     -h, --help                 Print this help
     -V, --version              Print the version
@@ -61,6 +72,13 @@ OUTPUTS (in DIR, with the default prefix OUT):
     OUT.discovered_transcript_counts.tsv          read counts per discovered transcript
     OUT.discovered_transcript_grouped_tag_TAG_counts.linear.tsv
                                                   per-group counts (only with --read-group)
+    OUT.phased_transcript_counts.tsv              per transcript: posterior mean and 90% interval
+                                                  of A and B reads, phase_uncertainty (1 = no
+                                                  allele evidence, 0 = fully phased), evid_A/B
+    OUT.phased_gene_summary.tsv                   per gene (genes sharing reads are merged):
+                                                  reads, allelic balance rho (mean, 90% interval,
+                                                  P(rho > 0.5)), TV(theta_A, theta_B),
+                                                  phase_uncertainty     (both only with --phase-vcf)
 These files have IsoQuant 4.1's formats; novel transcript and gene ids follow IsoQuant's naming
 (transcriptN.CHR.nic|nnic, novel_gene_CHR_N).
 
@@ -108,6 +126,9 @@ fn parse() -> Result<Option<Config>, Usage> {
     let mut prefix = "OUT".to_string();
     let mut grouped_out = None;
     let mut params_json = None;
+    let mut emit_read_assignments = None;
+    let (mut phase_vcf, mut phase_sample) = (None, None);
+    let (mut phase_sweeps, mut phase_burnin, mut phase_seed) = (1000u32, 200u32, 1u64);
     let (mut profile, mut verbose) = (false, false);
     while let Some(arg) = p.next().map_err(|e| Usage(e.to_string()))? {
         match arg {
@@ -165,6 +186,28 @@ fn parse() -> Result<Option<Config>, Usage> {
             }
             Long("prefix") => prefix = string(&mut p, "--prefix")?,
             Long("grouped-out") => grouped_out = Some(PathBuf::from(value(&mut p, "--grouped-out")?)),
+            Long("emit-read-assignments") => {
+                emit_read_assignments = Some(PathBuf::from(value(&mut p, "--emit-read-assignments")?))
+            }
+            Long("phase-vcf") => phase_vcf = Some(PathBuf::from(value(&mut p, "--phase-vcf")?)),
+            Long("phase-sample") => phase_sample = Some(string(&mut p, "--phase-sample")?),
+            Long("phase-sweeps") => {
+                phase_sweeps = string(&mut p, "--phase-sweeps")?
+                    .parse()
+                    .ok()
+                    .filter(|&n| n > 0)
+                    .ok_or_else(|| Usage("--phase-sweeps expects a positive integer".into()))?
+            }
+            Long("phase-burnin") => {
+                phase_burnin = string(&mut p, "--phase-burnin")?
+                    .parse()
+                    .map_err(|_| Usage("--phase-burnin expects a non-negative integer".into()))?
+            }
+            Long("phase-seed") => {
+                phase_seed = string(&mut p, "--phase-seed")?
+                    .parse()
+                    .map_err(|_| Usage("--phase-seed expects a non-negative integer".into()))?
+            }
             Long("params-json") => params_json = Some(PathBuf::from(value(&mut p, "--params-json")?)),
             Long("profile") => profile = true,
             Short('v') | Long("verbose") => verbose = true,
@@ -213,6 +256,14 @@ fn parse() -> Result<Option<Config>, Usage> {
         verbose,
         split,
         cmd_line: std::env::args().collect::<Vec<_>>().join(" "),
+        emit_read_assignments,
+        phase: phase_vcf.map(|vcf| PhaseConfig {
+            vcf,
+            sample: phase_sample,
+            burnin: phase_burnin,
+            sweeps: phase_sweeps,
+            seed: phase_seed,
+        }),
     }))
 }
 
@@ -230,6 +281,9 @@ fn preflight(cfg: &Config) -> Result<(), String> {
     file(&cfg.annotation, "annotation")?;
     if let Some(p) = &cfg.params_json {
         file(p, "params JSON")?;
+    }
+    if let Some(ph) = &cfg.phase {
+        file(&ph.vcf, "phase VCF")?;
     }
     std::fs::create_dir_all(&cfg.out_dir)
         .map_err(|e| format!("cannot create output directory {}: {e}", cfg.out_dir.display()))?;

@@ -90,10 +90,26 @@ With the default `--prefix OUT`, the output directory gets:
 | `OUT.transcript_models.gtf` | discovered transcript models, known and novel, in IsoQuant 4.1's GTF format |
 | `OUT.discovered_transcript_counts.tsv` | read count per discovered transcript |
 | `OUT.discovered_transcript_grouped_tag_TAG_counts.linear.tsv` | per-group counts (with `--read-group`) |
+| `OUT.phased_transcript_counts.tsv` | allele-specific counts per transcript, with 90% intervals (with `--phase-vcf`) |
+| `OUT.phased_gene_summary.tsv` | per-gene allelic balance and allele-specific isoform usage (with `--phase-vcf`) |
 
 Novel transcripts and genes use IsoQuant's naming (`transcriptN.CHR.nic|nnic`,
 `novel_gene_CHR_N`). The numbers `N` can differ from an IsoQuant run, so compare models by
 structure, not by ID. The GTF header records the iqrs version (`4.1.0-iqrs-0.1.0`).
+
+## Phased quantification (optional)
+
+`--phase-vcf donor.vcf.gz` adds allele-specific transcript quantification. iqrs reads each read's
+bases at the VCF's phased heterozygous SNVs during its normal BAM pass, then a Bayesian model
+(Gibbs sampling, per gene) splits every transcript's reads between haplotype A (the first GT
+allele) and haplotype B. Unlike counting reads by an HP tag, it uses every read: reads with no
+het site and reads ambiguous between transcripts are shared out by the model.
+
+Each transcript gets a `phase_uncertainty` between 0 and 1. Near 0, its allele split is pinned by
+reads that carry het evidence. At 1, no read of that transcript covers a het site, so its split
+comes from the prior and should not be interpreted. On whole GTEx genomes the step adds about 6%
+CPU time (25-45 CPU-s per sample) and under 1 GB of memory. Phase blocks are not used: GT is taken
+as one genome-wide phase. Other outputs are unchanged.
 
 ## Benchmark
 

@@ -1,0 +1,21 @@
+[package]
+name = "iq_phase"
+description = "Optional phased (allele-specific) transcript quantification: het evidence + blocked Gibbs sampler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+iq_types.workspace = true
+noodles-bgzf.workspace = true
+rustc-hash.workspace = true
+rayon.workspace = true
+xxhash-rust.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
+rand_xoshiro.workspace = true
+
+[lints]
+workspace = true

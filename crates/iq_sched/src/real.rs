@@ -20,6 +20,8 @@ use iq_regions::{GeneOracle, PassA, PassAConfig};
 use iq_types::{
     Block, BlockStore, ChrIdx, GeneIdx, IsoformIndex, Iv, Iv0, Params, PolyAUsage, RefSlice, TranscriptModel,
 };
+use std::io::Write as _;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 /// Bases added on each side of a cluster region for the reference window of its blocks.
@@ -54,6 +56,27 @@ pub struct RealPipeline {
     meta: Vec<Mutex<ChrMeta>>,
     groups: Option<SharedGroups>,
     pub cmd_line: String,
+    /// `--emit-read-assignments` sink (dev); chromosomes append as they merge.
+    reads_out: Option<Mutex<std::io::BufWriter<std::fs::File>>>,
+    /// Optional phasing step (`--phase-vcf`).
+    phase: Option<PhaseState>,
+}
+
+/// State of the optional phasing step.
+struct PhaseState {
+    sites: iq_phase::HetSites,
+    cfg: iq_phase::Cfg,
+    seed: u64,
+    /// Loci per chromosome (index into `chrs`), filled at merge.
+    loci: Mutex<Vec<(usize, Vec<iq_phase::Locus>)>>,
+    vcf_s: f64,
+    /// Het-evidence collection: summed nanoseconds, records scanned, reads with calls, calls.
+    ev_ns: AtomicU64,
+    ev_records: AtomicU64,
+    ev_reads: AtomicU64,
+    ev_calls: AtomicU64,
+    /// Locus building at merge (summed nanoseconds).
+    loci_ns: AtomicU64,
 }
 
 pub struct RealStore {
@@ -63,6 +86,8 @@ pub struct RealStore {
     /// Name hashes of reads this block shares with a neighbouring block (4.1 double
     /// processing of valley-straddling reads); U9 candidates at the barrier.
     pub shared: Vec<u64>,
+    /// Het evidence of the block's reads (phasing only).
+    pub phase_ev: Option<iq_phase::BlockEvidence>,
 }
 
 pub struct RealGlobal {
@@ -74,6 +99,8 @@ pub struct RealBlockOut {
     index: IsoformIndex,
     models: Vec<TranscriptModel>,
     counter: TxCounter,
+    reads: Vec<(String, u32, iq_types::FinalAssign)>,
+    phase: Option<iq_phase::PhaseReads>,
 }
 
 struct AnnOracle<'a> {
@@ -111,6 +138,14 @@ pub fn run_params(cfg: &Config) -> Result<Params, String> {
 impl RealPipeline {
     /// Phase 0: annotation, FASTA, BAM header/index, chromosome list.
     pub fn open(cfg: &Config) -> Result<Self, String> {
+        // the phased VCF loads while the annotation is parsed
+        let vcf_job = cfg.phase.as_ref().map(|pc| {
+            let (path, sample) = (pc.vcf.clone(), pc.sample.clone());
+            std::thread::spawn(move || {
+                let t = std::time::Instant::now();
+                iq_phase::vcf::load(&path, sample.as_deref()).map(|s| (s, t.elapsed().as_secs_f64()))
+            })
+        });
         let params = run_params(cfg)?;
         let gt = if cfg.gene_types_isoquant { GeneTypes::Isoquant } else { GeneTypes::All };
         let a = cfg.annotation.to_string_lossy();
@@ -148,6 +183,43 @@ impl RealPipeline {
         }
         chrs.sort_by(|a, b| b.len.cmp(&a.len).then_with(|| a.name.cmp(&b.name)));
         let meta = chrs.iter().map(|_| Mutex::new(ChrMeta::default())).collect();
+        let reads_out = match &cfg.emit_read_assignments {
+            Some(p) => {
+                let f = std::fs::File::create(p).map_err(err(&p.display().to_string()))?;
+                let mut w = std::io::BufWriter::new(f);
+                writeln!(w, "read_id\tchr\tgene_ids\tassignment_type\tcompatible_transcripts\tunique_transcript\tcounted_weight\tgroup")
+                    .map_err(err(&p.display().to_string()))?;
+                Some(Mutex::new(w))
+            }
+            None => None,
+        };
+        let phase = match (vcf_job, &cfg.phase) {
+            (Some(j), Some(pc)) => {
+                let (sites, vcf_s) = j.join().map_err(|_| "phase VCF reader panicked".to_string())??;
+                if cfg.verbose || cfg.profile {
+                    eprintln!(
+                        "[iqrs] phase VCF {:.2}s: sample {}, {} phased het SNVs on {} contigs",
+                        vcf_s,
+                        sites.sample,
+                        sites.n_sites(),
+                        sites.chrs.len()
+                    );
+                }
+                Some(PhaseState {
+                    sites,
+                    cfg: iq_phase::Cfg { burnin: pc.burnin, sweeps: pc.sweeps, ..Default::default() },
+                    seed: pc.seed,
+                    loci: Mutex::new(Vec::new()),
+                    vcf_s,
+                    ev_ns: AtomicU64::new(0),
+                    ev_records: AtomicU64::new(0),
+                    ev_reads: AtomicU64::new(0),
+                    ev_calls: AtomicU64::new(0),
+                    loci_ns: AtomicU64::new(0),
+                })
+            }
+            _ => None,
+        };
         Ok(RealPipeline {
             cfg: cfg.clone(),
             params,
@@ -160,6 +232,8 @@ impl RealPipeline {
             meta,
             groups: tag.map(|_| SharedGroups::new()),
             cmd_line: String::new(),
+            reads_out,
+            phase,
         })
     }
 
@@ -186,6 +260,96 @@ impl RealPipeline {
         let s = (lo - REF_MARGIN).max(1);
         let e = (hi + REF_MARGIN).min(len.max(1));
         Iv { s: s as i32, e: e as i32 }
+    }
+}
+
+impl RealPipeline {
+    /// Phasing: samples every locus and writes the two phased tables.
+    fn finish_phase(&self, p: &PhaseState, spec: &OutputSpec) -> Result<(), String> {
+        let mut per_chr = std::mem::take(&mut *p.loci.lock().unwrap_or_else(|e| e.into_inner()));
+        per_chr.sort_by_key(|(c, _)| *c);
+        let loci: Vec<iq_phase::Locus> = per_chr.into_iter().flat_map(|(_, l)| l).collect();
+        let (res, st) = iq_phase::run_loci(&loci, &p.cfg, p.seed);
+        let t = std::time::Instant::now();
+        iq_phase::write_outputs(&spec.dir, &spec.prefix, &loci, &res).map_err(err("write phased outputs"))?;
+        if self.cfg.verbose || self.cfg.profile {
+            let sweeps = (p.cfg.burnin + p.cfg.sweeps) as f64;
+            eprintln!(
+                "[iqrs] phasing: vcf {:.2}s; het evidence {:.2}s cpu over {} records ({} reads with calls, {} calls); \
+                 loci build {:.2}s cpu; sampling {:.2}s wall / {:.2}s cpu ({} + {} sweeps, {:.3} ms cpu per sweep \
+                 genome-wide); write {:.2}s; {} loci, {} genes, {} transcripts, {} reads, {} classes",
+                p.vcf_s,
+                p.ev_ns.load(Ordering::Relaxed) as f64 * 1e-9,
+                p.ev_records.load(Ordering::Relaxed),
+                p.ev_reads.load(Ordering::Relaxed),
+                p.ev_calls.load(Ordering::Relaxed),
+                p.loci_ns.load(Ordering::Relaxed) as f64 * 1e-9,
+                st.wall_s,
+                st.cpu_s,
+                p.cfg.burnin,
+                p.cfg.sweeps,
+                st.cpu_s * 1e3 / sweeps,
+                t.elapsed().as_secs_f64(),
+                st.loci,
+                st.genes,
+                st.transcripts,
+                st.reads,
+                st.classes
+            );
+            for &(sec, i) in &st.slowest {
+                let l = &loci[i];
+                eprintln!(
+                    "[iqrs] phasing: slow locus {} {:.2}s: {} reads, {} transcripts, {} classes, {} class-transcript pairs",
+                    l.name(),
+                    sec,
+                    l.n_reads(),
+                    l.tx.len(),
+                    l.n_classes(),
+                    l.cls_tx.len()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// `--emit-read-assignments` rows of one block: model indices resolved to final ids.
+    /// `counted_weight` is the read's `unique_only` weight (what the counter added per
+    /// transcript); `group` the read-group value (NA without one).
+    fn format_reads(&self, chr: usize, o: &RealBlockOut, names: &iq_quant::BlockNames, out: &mut String) {
+        use std::fmt::Write as _;
+        let pos: std::collections::HashMap<u32, usize> = o.models.iter().enumerate().map(|(i, m)| (m.key, i)).collect();
+        let pool =
+            self.groups.as_ref().map(|g| g.0.read().unwrap_or_else(|e| e.into_inner()).clone()).unwrap_or_default();
+        for (name, group, fa) in &o.reads {
+            let mut tx: Vec<&str> = Vec::new();
+            let mut genes: Vec<&str> = Vec::new();
+            for m in &fa.tx {
+                if let Some(&i) = pos.get(m) {
+                    if !tx.contains(&names.tx[i].as_str()) {
+                        tx.push(&names.tx[i]);
+                    }
+                    if !genes.contains(&names.gene[i].as_str()) {
+                        genes.push(&names.gene[i]);
+                    }
+                }
+            }
+            let fate = iq_quant::counter::read_fate(iq_quant::Strategy::UniqueOnly, fa.atype, !tx.is_empty(), tx.len());
+            let w = match fate {
+                iq_quant::ReadFate::Unique => 1.0,
+                iq_quant::ReadFate::Ambiguous { weight_one: true } => 1.0,
+                _ => 0.0,
+            };
+            let uniq = if w > 0.0 && tx.len() == 1 { tx[0] } else { "." };
+            let _ = writeln!(
+                out,
+                "{name}\t{}\t{}\t{}\t{}\t{uniq}\t{w}\t{}",
+                self.chrs[chr].name,
+                if genes.is_empty() { ".".to_string() } else { genes.join(",") },
+                fa.atype,
+                if tx.is_empty() { ".".to_string() } else { tx.join(",") },
+                iq_quant::output::group_name(&pool, *group),
+            );
+        }
     }
 }
 
@@ -216,8 +380,13 @@ impl Pipeline for RealPipeline {
         let cfg = PassAConfig::for_chr(&c.name, c.len, f.max_coverage_small_chr, f.max_coverage_normal_chr);
         let mut pa = PassA::new(AnnOracle { ann: &self.ann, chr: c.ann }, cfg);
         let region = Iv0 { s: 0, e: c.len as i64 - 1 };
-        let it = iq_bam::try_fetch(&self.bam_passa, &c.name, region, FetchOpts { seq: false, batch_records: 4096 })
-            .map_err(err(&c.name))?;
+        let it = iq_bam::try_fetch(
+            &self.bam_passa,
+            &c.name,
+            region,
+            FetchOpts { seq: false, batch_records: 4096, qual: false },
+        )
+        .map_err(err(&c.name))?;
         let mut last_pos0 = i64::MIN;
         for b in it {
             let b = b.map_err(err(&c.name))?;
@@ -263,20 +432,42 @@ impl Pipeline for RealPipeline {
         };
         let mut col = BlockCollector::new(block, &index, &reference, &self.params, &owner, groups);
         let bam = if block.owned_reads >= BIG_BLOCK_READS { &self.bam_big } else { &self.bam_collect };
-        let it = iq_bam::try_fetch(bam, &c.name, block.region, FetchOpts { seq: true, batch_records: 4096 })
-            .map_err(err(&c.name))?;
+        // phasing: het calls of every record, inline in this read pass
+        let sites = self.phase.as_ref().and_then(|p| p.sites.get(&c.name));
+        let mut ev = sites.map(|_| (iq_phase::EvidenceBuf::new(), 0u64, 0u64));
+        let opts = FetchOpts { seq: true, batch_records: 4096, qual: ev.is_some() };
+        let it = iq_bam::try_fetch(bam, &c.name, block.region, opts).map_err(err(&c.name))?;
         for b in it {
             let b = b.map_err(err(&c.name))?;
             let recs: Vec<_> = b.iter().collect();
             col.push(&recs);
+            if let (Some((buf, ns, n)), Some(sites)) = (ev.as_mut(), sites) {
+                let t = std::time::Instant::now();
+                for (i, r) in recs.iter().enumerate() {
+                    buf.push(sites, r, b.qual(i));
+                }
+                *n += recs.len() as u64;
+                *ns += t.elapsed().as_nanos() as u64;
+            }
         }
         let (store, stats, shared) = col.finish_shared();
-        Ok(RealStore { store, index, stats, shared })
+        let phase_ev = ev.map(|(buf, ns, n)| {
+            let t = std::time::Instant::now();
+            let keep: rustc_hash::FxHashSet<u64> = (0..store.len()).map(|i| store.view(i).name_hash()).collect();
+            let e = buf.finish(|h| keep.contains(&h));
+            let p = self.phase.as_ref().unwrap();
+            p.ev_ns.fetch_add(ns + t.elapsed().as_nanos() as u64, Ordering::Relaxed);
+            p.ev_records.fetch_add(n, Ordering::Relaxed);
+            p.ev_reads.fetch_add(e.n_reads() as u64, Ordering::Relaxed);
+            p.ev_calls.fetch_add(e.code.len() as u64, Ordering::Relaxed);
+            e
+        });
+        Ok(RealStore { store, index, stats, shared, phase_ev })
     }
 
     fn store_bytes(&self, s: &RealStore) -> u64 {
         // length-based resident bytes (vtg_proto #9: heap_bytes overstates by 1.35-2x)
-        s.store.len_bytes() as u64
+        s.store.len_bytes() as u64 + s.phase_ev.as_ref().map_or(0, |e| e.bytes() as u64)
     }
 
     fn barrier_chr(&self, chr: usize, _blocks: &[Block], stores: &mut [RealStore]) -> Result<ReadTotals, String> {
@@ -339,19 +530,54 @@ impl Pipeline for RealPipeline {
         let win = self.ref_window(chr, bi, &s.index);
         let seq = self.fasta.slice(&c.name, win).ok_or_else(|| format!("{}: not in reference", c.name))?;
         let reference = RefSlice { start: win.s, seq: &seq };
-        let bm = crate::construct::construct_block(&self.ann, &g.params, &s.index, &s.store, reference, dk);
-        Ok(RealBlockOut { index: s.index, models: bm.models, counter: bm.counter })
+        let emit = self.reads_out.is_some();
+        let phase = self.phase.as_ref().map(|_| s.phase_ev.as_ref());
+        let bm =
+            crate::construct::construct_block(&self.ann, &g.params, &s.index, &s.store, reference, dk, emit, phase);
+        Ok(RealBlockOut { index: s.index, models: bm.models, counter: bm.counter, reads: bm.reads, phase: bm.phase })
     }
 
     fn merge_chr(&self, chr: usize, _blocks: &[Block], outs: Vec<RealBlockOut>) -> Result<ChrOutput, String> {
         let mut w = ChrPhaseW::new(&self.ann, &self.chrs[chr].name);
+        let mut text = String::new();
+        let mut acc = self.phase.as_ref().map(|_| iq_phase::ChrAcc::new());
+        let mut phase_ns = 0u64;
         for o in &outs {
-            w.add_block(&BlockOutput { index: &o.index, models: &o.models, counter: &o.counter });
+            let names = w.add_block(&BlockOutput { index: &o.index, models: &o.models, counter: &o.counter });
+            if self.reads_out.is_some() {
+                self.format_reads(chr, o, &names, &mut text);
+            }
+            if let (Some(acc), Some(pr)) = (acc.as_mut(), o.phase.as_ref()) {
+                let t = std::time::Instant::now();
+                let pos: rustc_hash::FxHashMap<u32, usize> =
+                    o.models.iter().enumerate().map(|(i, m)| (m.key, i)).collect();
+                for r in 0..pr.len() {
+                    let tx = pr
+                        .models_of(r)
+                        .iter()
+                        .filter_map(|m| pos.get(m).map(|&i| (names.tx[i].as_str(), names.gene[i].as_str())));
+                    acc.add_read(Some(pr.hash[r]), tx, pr.d[r]);
+                }
+                phase_ns += t.elapsed().as_nanos() as u64;
+            }
+        }
+        if let (Some(acc), Some(p)) = (acc, self.phase.as_ref()) {
+            let t = std::time::Instant::now();
+            let loci = acc.build(&self.chrs[chr].name);
+            p.loci.lock().unwrap_or_else(|e| e.into_inner()).push((chr, loci));
+            p.loci_ns.fetch_add(phase_ns + t.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        }
+        if let Some(out) = &self.reads_out {
+            let mut f = out.lock().unwrap_or_else(|e| e.into_inner());
+            f.write_all(text.as_bytes()).map_err(err("emit read assignments"))?;
         }
         Ok(w.finish())
     }
 
     fn finish(&self, outs: Vec<ChrOutput>, _t: ReadTotals) -> Result<(), String> {
+        if let Some(out) = &self.reads_out {
+            out.lock().unwrap_or_else(|e| e.into_inner()).flush().map_err(err("emit read assignments"))?;
+        }
         let spec = OutputSpec {
             dir: self.cfg.out_dir.clone(),
             prefix: self.cfg.prefix.clone(),
@@ -367,6 +593,9 @@ impl Pipeline for RealPipeline {
             None => Default::default(),
         };
         iq_quant::write_outputs(&spec, &outs, &pool, self.bam_collect.unmapped()).map_err(err("write outputs"))?;
+        if let Some(p) = &self.phase {
+            self.finish_phase(p, &spec)?;
+        }
         Ok(())
     }
 

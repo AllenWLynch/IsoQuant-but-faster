@@ -7,12 +7,17 @@ use iq_model::ends::Ends;
 use iq_model::fl::{gene_id_ranks, FlAux, LiveAssigner};
 use iq_model::{Ctx, DetectedKnown};
 use iq_quant::TxCounter;
-use iq_types::{BlockStore, GeneKey, IsoformIndex, ModelStore, Params, RefSlice, TranscriptModel};
+use iq_types::{BlockStore, FinalAssign, GeneKey, IsoformIndex, ModelStore, Params, RefSlice, TranscriptModel};
 
 /// Final models and counters of one block.
 pub struct BlockModels {
     pub models: Vec<TranscriptModel>,
     pub counter: TxCounter,
+    /// Per-read final assignments (read name, read group, assignment) when requested
+    /// (`--emit-read-assignments`), in read order.
+    pub reads: Vec<(String, u32, FinalAssign)>,
+    /// Model reads for the optional phasing step (`--phase-vcf`).
+    pub phase: Option<iq_phase::PhaseReads>,
 }
 
 /// Runs model construction and quantification for one collected block. `detected_known` is
@@ -25,10 +30,14 @@ pub fn construct_block(
     store: &BlockStore,
     reference: RefSlice<'_>,
     detected_known: &mut DetectedKnown,
+    emit_reads: bool,
+    phase: Option<Option<&iq_phase::BlockEvidence>>,
 ) -> BlockModels {
     let mut counter = TxCounter::new();
+    let mut reads = Vec::new();
+    let mut phase_reads = phase.map(|_| iq_phase::PhaseReads::default());
     if store.is_empty() {
-        return BlockModels { models: Vec::new(), counter };
+        return BlockModels { models: Vec::new(), counter, reads, phase: phase_reads };
     }
     // U10b: polyA (+TSS with --fl_data) predictions          parallel_workers.py:320-330
     let preds = iq_terminal::block_predictions(store, index, iq_terminal::bundled_models(), params);
@@ -61,6 +70,17 @@ pub fn construct_block(
     iq_model::joiner::join_genes(&mut ms.models, index);
     iq_model::final_assign::final_assignments(&ms, &ctx, |r, fa| {
         counter.add(&fa, store.view(r as usize).group());
+        if let Some(pr) = phase_reads.as_mut() {
+            if !fa.tx.is_empty() && iq_phase::PhaseReads::is_model_type(fa.atype) {
+                let h = store.view(r as usize).name_hash();
+                let d = phase.flatten().map_or(0.0, |e| e.delta(h));
+                pr.push(h, &fa.tx, d);
+            }
+        }
+        if emit_reads {
+            let v = store.view(r as usize);
+            reads.push((v.name().to_owned(), v.group(), fa));
+        }
     });
-    BlockModels { models: ms.models, counter }
+    BlockModels { models: ms.models, counter, reads, phase: phase_reads }
 }

@@ -13,6 +13,7 @@ members = [
     "crates/iq_model",
     "crates/iq_quant",
     "crates/iq_sched",
+    "crates/iq_phase",
     "bins/iqrs",
     "dev/iqrs-fixture",
     "bins/iqrs-compare",
@@ -41,6 +42,7 @@ iq_graph = { path = "crates/iq_graph" }
 iq_model = { path = "crates/iq_model" }
 iq_quant = { path = "crates/iq_quant" }
 iq_sched = { path = "crates/iq_sched" }
+iq_phase = { path = "crates/iq_phase" }
 
 # external (design doc §11; keep this list minimal)
 serde = { version = "1", features = ["derive"] }
@@ -61,6 +63,10 @@ noodles-sam = "0.93"
 noodles-csi = "0.62"
 rust-htslib = { version = "1", default-features = false }
 proptest = "1"
+# optional phased quantification (iq_phase)
+rand = "0.10"
+rand_distr = "0.6"
+rand_xoshiro = "0.8"
 
 # Dependencies (serde_json, flate2, proptest, ...) optimised in dev/test builds so that the
 # fixture tests over real captures stay fast; workspace crates keep debug settings.

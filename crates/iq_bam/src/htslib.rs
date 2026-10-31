@@ -53,7 +53,7 @@ impl HtsBam {
         Ok(HtsFetch {
             reader: r,
             rec: hbam::Record::new(),
-            dec: Decoder { tag: self.tag, seq: opts.seq },
+            dec: Decoder { tag: self.tag, seq: opts.seq, qual: opts.qual && opts.seq },
             batch_records: opts.batch_records.max(1),
             seq_no: 0,
             done: false,
@@ -95,6 +95,7 @@ impl HtsFetch {
                 packed_seq: &data[seq_off..qual_off],
                 l_seq,
                 qual0: data.get(qual_off).copied().filter(|_| l_seq > 0),
+                qual: &data[qual_off..aux_off],
                 aux: &data[aux_off..],
             },
             b,

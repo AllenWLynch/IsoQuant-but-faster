@@ -99,7 +99,7 @@ fn run_pass_a(bam: &BamHandle, chr: &str, smp: &Sampler) -> Vec<Block> {
     smp.reset();
     let t = Instant::now();
     let mut pa = PassA::new(iq_regions::NoGenes, cfg);
-    let opts = FetchOpts { seq: false, batch_records: 4096 };
+    let opts = FetchOpts { seq: false, batch_records: 4096, qual: false };
     for b in fetch_with(bam, chr, Iv0 { s: 0, e: len as i64 - 1 }, opts) {
         for r in b.iter() {
             pa.push_lite(&r);

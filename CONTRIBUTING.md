@@ -21,6 +21,7 @@ crates/iq_graph      intron graph and path threading
 crates/iq_model      transcript model construction, filtering, read reassignment, gene joining
 crates/iq_quant      counters, GTF/TSV writers, novel ID numbering
 crates/iq_sched      work units, memory admission, rayon orchestration
+crates/iq_phase      optional phased quantification (--phase-vcf): het evidence, Gibbs sampler
 dev/iqrs-fixture     runs the unit fixture runners against captured IsoQuant fixtures
 dev/harness          iqcap, the Python harness that captures fixtures from a live IsoQuant 4.1 run
 docs/dev             developer notes (deviation log, release notes)

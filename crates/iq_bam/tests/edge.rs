@@ -59,7 +59,7 @@ fn no_seq_option_and_batching() {
     let all = |opts: FetchOpts, bam: &BamHandle| -> Vec<RecordBatch> {
         try_fetch(bam, "c1", Iv0 { s: 0, e: 2_999_999 }, opts).unwrap().map(|b| b.unwrap()).collect()
     };
-    let a = all(FetchOpts { seq: false, batch_records: 7 }, &bam);
+    let a = all(FetchOpts { seq: false, batch_records: 7, qual: false }, &bam);
     let b = all(FetchOpts::default(), &bam);
     assert!(a.len() > 1);
     assert!(a.iter().enumerate().all(|(k, x)| x.seq_no == k as u64 && x.len() <= 7));

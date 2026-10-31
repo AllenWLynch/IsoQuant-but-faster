@@ -45,11 +45,14 @@ pub struct FetchOpts {
     pub seq: bool,
     /// Target number of records per batch.
     pub batch_records: usize,
+    /// Also keep base qualities ([`RecordBatch::qual`]; needs `seq`). Only the optional
+    /// phasing step uses them.
+    pub qual: bool,
 }
 
 impl Default for FetchOpts {
     fn default() -> Self {
-        FetchOpts { seq: true, batch_records: 4096 }
+        FetchOpts { seq: true, batch_records: 4096, qual: false }
     }
 }
 
@@ -256,6 +259,8 @@ pub struct RecordBatch {
     names: Vec<u8>,
     cigars: Vec<u32>,
     seqs: Vec<u8>,
+    /// Raw Phred qualities, laid out like `seqs` (only with [`FetchOpts::qual`]).
+    quals: Vec<u8>,
     tags: Vec<TagValue>,
 }
 
@@ -271,6 +276,7 @@ impl RecordBatch {
         self.names.clear();
         self.cigars.clear();
         self.seqs.clear();
+        self.quals.clear();
         self.tags.clear();
     }
     /// `[start(i), start(i + 1))` of one flat array (`total` = its length).
@@ -294,6 +300,14 @@ impl RecordBatch {
             seq: &self.seqs[seq],
             tag: (m.tag != NO_TAG).then(|| &self.tags[m.tag as usize]),
         }
+    }
+    /// Raw Phred base qualities of record `i` (`0xff` bytes when the record has none); empty
+    /// unless fetched with [`FetchOpts::qual`].
+    pub fn qual(&self, i: usize) -> &[u8] {
+        if self.quals.is_empty() {
+            return &[];
+        }
+        &self.quals[self.range(i, |m| m.seq, self.seqs.len())]
     }
     /// Header reference index of record `i` (`-1` = none).
     pub fn ref_id(&self, i: usize) -> i32 {
@@ -480,6 +494,7 @@ pub(crate) struct Core {
 pub(crate) struct Decoder {
     pub tag: Option<[u8; 2]>,
     pub seq: bool,
+    pub qual: bool,
 }
 
 /// Field offsets of one raw BAM record (without the `block_size` prefix).
@@ -560,6 +575,7 @@ impl Decoder {
                 packed_seq: &raw[l.seq_off..l.qual_off],
                 l_seq: l.l_seq,
                 qual0: raw.get(l.qual_off).copied(),
+                qual: &raw[l.qual_off..l.aux_off],
                 aux: &raw[l.aux_off..],
             },
             b,
@@ -576,6 +592,10 @@ impl Decoder {
         b.cigars.extend(p.cigar);
         if self.seq {
             decode_seq_into(p.packed_seq, p.l_seq, &mut b.seqs);
+            if self.qual {
+                b.quals.extend_from_slice(&p.qual[..p.l_seq.min(p.qual.len())]);
+                b.quals.resize(b.seqs.len(), 0xff);
+            }
         }
         let (mut tag_ty, mut tag) = ([0, 0], NO_TAG);
         if let Some(t) = self.tag {
@@ -615,6 +635,8 @@ pub(crate) struct Parts<'a, C> {
     pub l_seq: usize,
     /// First quality byte (`0xff` = absent).
     pub qual0: Option<u8>,
+    /// All quality bytes (copied only with [`Decoder::qual`]).
+    pub qual: &'a [u8],
     pub aux: &'a [u8],
 }
 
@@ -770,7 +792,7 @@ pub fn try_fetch(bam: &BamHandle, chr: &str, region: Iv0, opts: FetchOpts) -> io
         tid: tid as i32,
         beg,
         end,
-        dec: Decoder { tag: bam.opts.tag, seq: opts.seq },
+        dec: Decoder { tag: bam.opts.tag, seq: opts.seq, qual: opts.qual && opts.seq },
         batch_records: opts.batch_records.max(1),
         seq_no: 0,
         raw: Vec::with_capacity(1 << 16),

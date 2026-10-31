@@ -105,7 +105,11 @@ bases at the VCF's phased heterozygous SNVs during its normal BAM pass, then a B
 allele) and haplotype B. Unlike counting reads by an HP tag, it uses every read: reads with no
 het site and reads ambiguous between transcripts are shared out by the model.
 
-Each transcript gets a `phase_uncertainty` between 0 and 1. Near 0, its allele split is pinned by
+Each transcript gets `phase_prob_A`, the posterior share of its reads on haplotype A, and
+`evid_A`/`evid_B`, the effective number of reads phased to each allele by their own het sites.
+The evidence columns are sufficient statistics: Beta(1 + evid_A, 1 + evid_B) is the data-only
+posterior of the transcript's allele split, so downstream tools can compute any interval or apply
+their own prior. `phase_uncertainty`, between 0 and 1, summarises it. Near 0, the allele split is pinned by
 reads that carry het evidence. At 1, no read of that transcript covers a het site, so its split
 comes from the prior and should not be interpreted. On whole GTEx genomes the step adds about 6%
 CPU time (25-45 CPU-s per sample) and under 1 GB of memory. Phase blocks are not used: GT is taken

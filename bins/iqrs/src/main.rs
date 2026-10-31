@@ -73,12 +73,16 @@ OUTPUTS (in DIR, with the default prefix OUT):
     OUT.discovered_transcript_grouped_tag_TAG_counts.linear.tsv
                                                   per-group counts (only with --read-group)
     OUT.phased_transcript_counts.tsv              per transcript: posterior mean and 90% interval
-                                                  of A and B reads, phase_uncertainty (1 = no
-                                                  allele evidence, 0 = fully phased), evid_A/B
+                                                  of A and B reads, phase_prob_A (posterior share
+                                                  on A), evid_A/B (effective phased reads; the
+                                                  data-only posterior is Beta(1+evid_A, 1+evid_B)),
+                                                  phase_uncertainty (1 = no allele evidence, 0 =
+                                                  fully phased)
     OUT.phased_gene_summary.tsv                   per gene (genes sharing reads are merged):
                                                   reads, allelic balance rho (mean, 90% interval,
                                                   P(rho > 0.5)), TV(theta_A, theta_B),
-                                                  phase_uncertainty     (both only with --phase-vcf)
+                                                  phase_uncertainty, evid_A/B
+                                                  (both only with --phase-vcf)
 These files have IsoQuant 4.1's formats; novel transcript and gene ids follow IsoQuant's naming
 (transcriptN.CHR.nic|nnic, novel_gene_CHR_N).
 

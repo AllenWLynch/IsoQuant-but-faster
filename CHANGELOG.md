@@ -1,12 +1,13 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-30)
 
 First public release.
 
 - Optional phased quantification (`--phase-vcf`): allele-specific transcript counts from a
-  phased VCF via a per-gene Bayesian model, with a per-transcript `phase_uncertainty`.
-
+  phased VCF via a per-gene Bayesian model, with per-transcript `phase_prob_A` and
+  `phase_uncertainty`. `--phase-alpha` (default 5) sets how strongly the two haplotypes'
+  isoform proportions are shrunk towards a shared profile.
 - Transcript discovery and quantification matching IsoQuant 4.1.0 for one bulk,
   coordinate-sorted, indexed BAM. PacBio is `sensitive_pacbio` with `--fl_data`; ONT is
   `sensitive_ont`.

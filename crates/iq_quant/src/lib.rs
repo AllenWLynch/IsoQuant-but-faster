@@ -1,7 +1,6 @@
 //! # iq_quant — U20: transcript model counters, GTF/TSV writers, ID renumbering
 //!
-//! Design §8, §5.6.
-//! - [`counter`] — per-block `AssignedFeatureCounter` (`unique_only`), keyed by `ModelIdx`.
+//! //! - [`counter`] — per-block `AssignedFeatureCounter` (`unique_only`), keyed by `ModelIdx`.
 //! - [`ids`] — novel transcript/gene numbering (D-M1, `ExcludingIdDistributor`), exon ids.
 //! - [`gtf`] — `GFFPrinter.dump`.
 //! - [`output`] — Phase W per chromosome ([`ChrPhaseW`]) and the final files.

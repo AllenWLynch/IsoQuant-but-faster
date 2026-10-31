@@ -1,6 +1,6 @@
 //! # iq_regions — U3: pass A (coverage clusters and blocks) and read ownership
 //!
-//! Design §5.1-5.2. Entry points:
+//! Entry points:
 //! - [`PassA`] / [`pass_a`]: stream a chromosome's records once → [`Cluster`]s of [`Block`]s
 //!   (gap bridging by shared genes, coverage bins, valley splits, coverage cap, gene lists,
 //!   owned-record counts) + duplicate-name candidates.

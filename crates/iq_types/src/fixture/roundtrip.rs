@@ -12,7 +12,7 @@ where
     I: DeserializeOwned + Serialize,
     O: DeserializeOwned + Serialize,
 {
-    // exceptions (§0.8) have their own out shape
+    // exceptions have their own out shape
     let raw: Case = serde_json::from_str(line)?;
     if raw.out.get("exception").is_some() {
         let c: Case<I, ExceptionOut> = serde_json::from_str(line)?;

@@ -1,4 +1,4 @@
-//! Block driver (design §7.1; order = 4.1 `GraphBasedModelConstructor.process`,
+//! Block driver (order = 4.1 `GraphBasedModelConstructor.process`,
 //! `model_construction.py:113-134`), composing U10b → U11 → U12 → U13-U19 → U20 counter.
 
 use iq_annot::AnnotationIndex;

@@ -93,7 +93,7 @@ fn err<E: std::fmt::Display>(ctx: &str) -> impl Fn(E) -> String + '_ {
     move |e| format!("{ctx}: {e}")
 }
 
-/// Parameters for a run (design §7.0): preset or hidden `--params-json`, plus the CLI flags.
+/// Parameters for a run: preset or hidden `--params-json`, plus the CLI flags.
 pub fn run_params(cfg: &Config) -> Result<Params, String> {
     let mut p = match &cfg.params_json {
         Some(path) => {

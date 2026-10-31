@@ -1,5 +1,5 @@
 //! Effective parameters (the 4.1 `args` subset iqrs uses) and the two built-in parameter
-//! sets of design §7.0. There is no option surface beyond these presets; tests may load a
+//! sets. There is no option surface beyond these presets; tests may load a
 //! 4.1 `params.json` instead ([`Params::from_params_json`]).
 //!
 //! Source citations are `isoquant.py:N` (repository root) unless a path is given. Values
@@ -130,7 +130,7 @@ pub struct Params {
     pub report_canonical: StrandnessReporting,
     /// `--polya_requirement`, default `auto` (`:368-372`).
     pub polya_requirement: PolyAUsage,
-    /// Run-time decision (barrier, §5.4): polyA fraction ≥ `polya_percentage_threshold`
+    /// Run-time decision (barrier): polyA fraction ≥ `polya_percentage_threshold`
     /// (`dataset_processor.py:283-300`). `false` until decided (`:1037`).
     pub requires_polya_for_construction: bool,
     /// `:1306`.
@@ -278,7 +278,7 @@ impl FilterParams {
 }
 
 impl Params {
-    /// Built-in parameter set for a data type (design §7.0).
+    /// Built-in parameter set for a data type.
     pub fn preset(dt: DataType) -> Self {
         match dt {
             DataType::Pacbio => Self::pacbio(),
@@ -335,7 +335,7 @@ impl Params {
     }
 
     /// Delta of the single-model assigners of the final counter:
-    /// `max(delta, graph_clustering_distance)` (design §7.11).
+    /// `max(delta, graph_clustering_distance)`.
     pub fn final_single_delta(&self) -> i32 {
         self.matching.delta.max(self.model.graph_clustering_distance)
     }

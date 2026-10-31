@@ -1,6 +1,6 @@
 //! # iq_graph — U11 (intron graph) and U12 (path threading)
 //!
-//! Design §7.2-7.3. Results are the contract types [`iq_types::IntronGraph`] and
+//! Results are the contract types [`iq_types::IntronGraph`] and
 //! [`iq_types::PathStorage`]; graph queries other units need (component coverage, ...)
 //! live here as functions over `IntronGraph`.
 //! Fixture runners: unit `U11` (fn `IntronGraph.__init__`) and `U12` (fns

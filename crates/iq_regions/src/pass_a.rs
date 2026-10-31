@@ -1,4 +1,4 @@
-//! Pass A (design §5.1): stream every record of a chromosome once, cut clusters at gaps not
+//! Pass A: stream every record of a chromosome once, cut clusters at gaps not
 //! bridged by a shared gene (`AlignmentCollector.process`), split each cluster at coverage
 //! valleys (`forward_alignments` → `split_coverage_regions`), and annotate each block with
 //! max coverage, the coverage cap, its genes and an estimate of the records it processes
@@ -39,7 +39,7 @@ impl<G: GeneOracle + ?Sized> GeneOracle for &G {
     }
 }
 
-/// What pass A reads per record (§5.1).
+/// What pass A reads per record.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct PassARecord {
     pub pos0: i64,

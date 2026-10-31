@@ -27,9 +27,7 @@ docs/dev             developer notes (deviation log, release notes)
 ```
 
 Code comments name the IsoQuant 4.1 source each function ports (`file.py:lines`, relative to
-`isoquant_lib/`). Some comments also cite sections of the original design document
-(`design §N`), which is not part of this repository. Where iqrs keeps a surprising 4.1
-behaviour on purpose, the comment says "matches IsoQuant 4.1".
+`isoquant_lib/`). Where iqrs keeps a surprising 4.1 behaviour on purpose, the comment says "matches IsoQuant 4.1".
 
 ## Build and test
 

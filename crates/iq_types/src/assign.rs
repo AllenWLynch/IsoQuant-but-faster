@@ -1,4 +1,4 @@
-//! Assignment records (design §2.1, §2.4): `MatchEvent`, `IsoformMatch`, `Assignment`, and
+//! Assignment records: `MatchEvent`, `IsoformMatch`, `Assignment`, and
 //! the id-free references `GeneKey` / `IsoRef`.
 //!
 //! These are the **core** (in-memory) types. They hold numeric keys, not IsoQuant id
@@ -42,7 +42,7 @@ impl MatchEvent {
 
 /// Gene reference. `Ref` = annotated gene (index into the annotation, or into the fixture
 /// gene interner). `Novel(k)` = block-local novel gene number `k`, renumbered to
-/// `novel_gene_<chr>_<N>` at output (Phase W, §5.6).
+/// `novel_gene_<chr>_<N>` at output (Phase W).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GeneKey {
     Ref(GeneIdx),
@@ -56,7 +56,7 @@ pub enum IsoRef {
     Model(ModelIdx),
 }
 
-/// Inline capacity of the event list of one match (1-2 events per read is typical, §2.3).
+/// Inline capacity of the event list of one match (1-2 events per read is typical).
 pub type Events = SmallVec<[MatchEvent; 2]>;
 /// Inline capacity of the match list of one assignment.
 pub type Matches = SmallVec<[IsoformMatch; 1]>;
@@ -72,7 +72,7 @@ pub struct IsoformMatch {
     pub tx_strand: Strand,
     /// `match_classification`.
     pub class: MatchClass,
-    /// `penalty_score` (f64, summed in event-list order, §6.4.4).
+    /// `penalty_score` (f64, summed in event-list order).
     pub penalty: f64,
     /// `match_subclassifications`, in order.
     pub events: Events,

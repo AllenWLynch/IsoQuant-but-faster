@@ -1,4 +1,4 @@
-//! M1 vtg memory prototype (design §2.3, §5.4, §5.7). Measurement tool, not production code.
+//! M1 vtg memory prototype. Measurement tool, not production code.
 //!
 //! ```text
 //! vtg_proto passa <bam> <chr> [threads]   # pass A only: time, rec/s, peak RSS, clusters/blocks
@@ -12,7 +12,7 @@
 //!
 //! Stubs (U1/U6 not integrated): no gene DB (`NoGenes`: gaps always split clusters, all blocks
 //! intergenic), `corrected_exons = exons`, `strand = mapped_strand`, empty assignment (real
-//! assignments add ~40 B/read of matches/events, design §2.3).
+//! assignments add ~40 B/read of matches/events).
 
 use iq_bam::{fetch_with, BamHandle, FetchOpts};
 use iq_read::polya::{ExternalPolyA, PolyAParams};

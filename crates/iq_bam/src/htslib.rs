@@ -1,4 +1,4 @@
-//! rust-htslib fallback backend (design §6.1), enabled with `--features htslib`.
+//! rust-htslib fallback backend, enabled with `--features htslib`.
 //!
 //! htslib does the region iteration (`hts_itr_next`) and BGZF inflate (`hts_set_threads`);
 //! records are copied into the same flat [`RecordBatch`] as the noodles backend.

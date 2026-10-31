@@ -1,4 +1,4 @@
-//! mmap'd FASTA + `.fai` (design §6.1): line-length arithmetic, no case folding.
+//! mmap'd FASTA + `.fai`: line-length arithmetic, no case folding.
 //!
 //! Equals pyfaidx `Fasta(fa)[chr][s-1:e]` (default options: no case change, python slice
 //! clipping) for `1 <= s`. A slice inside one FASTA line is borrowed from the map; a slice

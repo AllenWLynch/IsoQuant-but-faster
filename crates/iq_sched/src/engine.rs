@@ -1,4 +1,4 @@
-//! The coordinator: two-phase run with memory-budget admission (design §5.4).
+//! The coordinator: two-phase run with memory-budget admission.
 //!
 //! One coordinator (the calling thread, never a pool worker) owns all scheduling state and
 //! a priority queue of ready tasks; tasks run on one rayon pool and report back over a
@@ -13,7 +13,7 @@
 //!   ahead of collect; pass A of one chromosome overlaps collect of the chromosomes already
 //!   done (vtg_proto finding #11);
 //! - class "work" (collect, construct): largest estimated cost first (LPT), strict
-//!   head-of-line admission against the byte budget (design §5.4).
+//!   head-of-line admission against the byte budget.
 //!
 //! At most `threads` tasks run at once; a task may use more workers through nested rayon
 //! parallelism (a giant block's per-read work), so idle workers are never stranded.

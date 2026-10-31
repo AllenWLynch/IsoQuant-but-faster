@@ -1,4 +1,4 @@
-//! Primitive and shared scalar types (design §2.1).
+//! Primitive and shared scalar types.
 //!
 //! Coordinates follow IsoQuant: genomic intervals are **1-based and closed**. BAM positions
 //! are converted on decode (0-based `pos` becomes `pos + 1`). The only 0-based intervals in
@@ -23,7 +23,7 @@ pub type GeneIdx = u32;
 pub type TxIdx = u32;
 /// Index into a block's [`crate::ModelStore`] = model creation order within the block.
 pub type ModelIdx = u32;
-/// Read index within a block (BAM order = 4.1 dump order, §5.5).
+/// Read index within a block (BAM order = 4.1 dump order).
 pub type ReadIdx = u32;
 
 /// Closed interval `[s, e]` with 1-based coordinates (IsoQuant's `(start, end)` tuples).

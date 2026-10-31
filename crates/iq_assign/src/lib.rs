@@ -1,6 +1,6 @@
 //! # iq_assign — U5 (read profiles) and U6 (read→isoform assignment)
 //!
-//! Design §6.4.2-6.4.4. One assigner, used against reference and model indices.
+//! One assigner, used against reference and model indices.
 //! Fixture runners: unit `U5` (fns `construct_profiles`, `match_genomic_features`) and
 //! `U6` (fn `assign_to_isoform`), see [`register_fixtures`].
 #![allow(unused_variables)] // stub: remove once implemented

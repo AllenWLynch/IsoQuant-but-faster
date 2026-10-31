@@ -1,5 +1,5 @@
 iqrs
-Copyright (C) 2026 the iqrs authors
+Copyright (C) 2026 Allen Lynch
 
 iqrs is a Rust reimplementation of part of IsoQuant 4.1 (transcript discovery and
 quantification for bulk long-read RNA-seq). Its algorithms, parameters and output formats

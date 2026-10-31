@@ -759,7 +759,7 @@ pub mod fixture {
         judge_pred(p, (g.margin, g.proba, g.label), (w.margin, w.proba, w.label), e);
     }
 
-    /// Tolerant comparison (§3 U10a pass criteria); histograms that fail it are re-checked
+    /// Tolerant comparison (U10a fixture pass criteria); histograms that fail it are re-checked
     /// for D-T1 consistency.
     pub fn compare_batch(got: &U10aDetectPeaksOut, want: &U10aDetectPeaksOut) -> Verdict {
         let mut e = Vec::new();

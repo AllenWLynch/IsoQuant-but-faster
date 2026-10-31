@@ -2,7 +2,7 @@
 //! `prepare_multimapper_dict` (`processed_read_manager.py:20-58`) and the application of
 //! the result in `FullAssignmentLoader.load_read_assignment` (`assignment_loader.py:50-70`).
 //!
-//! Flow at the §5.4 barrier:
+//! Flow at the barrier:
 //! 1. [`duplicate_groups`] over every block store of the run (in chromosome, block order):
 //!    groups of reads sharing a QNAME, in 4.1 list order.
 //! 2. [`BasicRead::from_view`] per member, [`resolve`] per group.

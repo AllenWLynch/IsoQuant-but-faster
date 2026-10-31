@@ -1,4 +1,4 @@
-//! Columnar per-block read storage (design §2.3): [`BlockStore`], [`ChainTable`] interning
+//! Columnar per-block read storage: [`BlockStore`], [`ChainTable`] interning
 //! and the [`ReadView`] accessor that construct-side algorithms (U10-U19) are written
 //! against.
 //!
@@ -20,7 +20,7 @@ use crate::read::ReadRecord;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
-/// xxh3-64 of a QNAME (duplicate-name detection, §2.3, §5.5).
+/// xxh3-64 of a QNAME (duplicate-name detection).
 #[inline]
 pub fn name_hash(qname: &[u8]) -> u64 {
     xxhash_rust::xxh3::xxh3_64(qname)
@@ -172,13 +172,13 @@ pub struct MatchRow {
     pub tx: Option<IsoRef>,
     pub tx_strand: Strand,
     pub class: MatchClass,
-    /// Stored as f64 (exact; the §2.3 f32 compaction is a later optimisation behind this API).
+    /// Stored as f64 (exact; an f32 compaction is a later optimisation behind this API).
     pub penalty: f64,
     pub ev_off: u32,
     pub n_ev: u32,
 }
 
-/// Columnar storage of one block's reads (design §2.3). Row `i` is the read with block
+/// Columnar storage of one block's reads. Row `i` is the read with block
 /// index `i` unless the records given to [`BlockStore::from_records`] had non-dense `idx`
 /// values (sampled fixtures), in which case the original `idx` is kept in a side column.
 #[derive(Clone, Debug, Default)]
@@ -348,7 +348,7 @@ impl BlockStore {
         }
     }
 
-    // ---- barrier patches (U9 / §5.4) ----
+    // ---- barrier patches (U9) ----
 
     /// Overwrites `assignment_type` / `gene_assignment_type` of read `i`.
     pub fn set_types(&mut self, i: usize, atype: AssignmentType, gene_atype: AssignmentType) {
@@ -364,7 +364,7 @@ impl BlockStore {
         }
     }
 
-    /// Approximate heap bytes held (for admission-control calibration, §5.4).
+    /// Approximate heap bytes held (for admission-control calibration).
     pub fn heap_bytes(&self) -> usize {
         use std::mem::size_of;
         self.name_hash.capacity() * 8

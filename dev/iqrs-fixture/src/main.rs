@@ -1,4 +1,4 @@
-//! `iqrs-fixture`: runs unit fixture runners against golden fixtures (design §3.0, §10.3).
+//! `iqrs-fixture`: runs unit fixture runners against golden fixtures.
 //!
 //! ```text
 //! iqrs-fixture run <unit|all> <file|dir> [--examples N]

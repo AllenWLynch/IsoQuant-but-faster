@@ -1,4 +1,4 @@
-//! Phase W and the final writers (design §5.6, §8).
+//! Phase W and the final writers.
 //!
 //! Per chromosome, blocks are consumed in genomic order by [`ChrPhaseW`]: models are named
 //! ([`crate::ids::NovelNamer`]), the GTF fragment is printed ([`crate::gtf::GtfChrWriter`]),
@@ -263,7 +263,7 @@ pub fn fragment_order(prefix: &str, suffix: &str, chrs: &[&str]) -> Vec<usize> {
     order
 }
 
-/// Output configuration (design §8).
+/// Output configuration.
 #[derive(Clone, Debug)]
 pub struct OutputSpec {
     pub dir: PathBuf,

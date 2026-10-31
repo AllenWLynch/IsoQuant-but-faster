@@ -1,4 +1,4 @@
-//! `IsoformIndex` (the 4.1 `GeneInfo` equivalent, design §2.2) and read profiles (U5 output
+//! `IsoformIndex` (the 4.1 `GeneInfo` equivalent) and read profiles (U5 output
 //! = U6 input).
 //!
 //! Builders live elsewhere: `IsoformIndex::from_genes` / `from_models` in `iq_annot` (U1),
@@ -115,8 +115,8 @@ pub struct IsoformIndex {
     /// model indices, storage order.
     pub iso: Vec<IsoRec>,
     /// Rank of each isoform's id string in Python codepoint order; every
-    /// `sorted(isoform_ids)` in 4.1 uses it (§6.4.1). For model indices without real ids:
-    /// creation order (see design §5.6, last bullet).
+    /// `sorted(isoform_ids)` in 4.1 uses it. For model indices without real ids:
+    /// creation order.
     pub id_rank: Vec<u32>,
     /// Flat per-isoform exons / introns; `IsoRec` holds offsets.
     pub iso_exons: Vec<Iv>,

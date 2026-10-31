@@ -1,4 +1,4 @@
-//! Read ownership (design §5.2).
+//! Read ownership.
 //!
 //! 4.1 re-fetches every split region, so a record overlapping two blocks is processed in
 //! both, and iqrs does the same (U8 decides with the fetch window, see

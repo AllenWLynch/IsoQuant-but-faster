@@ -1,4 +1,4 @@
-//! GFF3 / GTF streaming parsers (design §4.1, §4.4).
+//! GFF3 / GTF streaming parsers.
 //!
 //! One pass over the file keeps two kinds of rows:
 //! - *leaf* rows (exon, CDS, codons, UTRs): parent row, interval, type; exons with an
@@ -65,7 +65,7 @@ pub fn parse_gff3_reader<R: BufRead>(r: R, gene_types: GeneTypes) -> Result<Anno
     raw.finish(gene_types)
 }
 
-/// GTF input (§4.4; parity is only claimed for GFF3).
+/// GTF input (parity is only claimed for GFF3).
 pub fn parse_gtf(path: &Path, gene_types: GeneTypes) -> Result<AnnotationIndex, AnnotError> {
     let f = File::open(path).map_err(|e| AnnotError(format!("{}: {e}", path.display())))?;
     parse_gtf_reader(BufReader::with_capacity(1 << 20, f), gene_types)
@@ -354,7 +354,7 @@ impl Raw {
         Ok(())
     }
 
-    /// GTF row (§4.4): `gene_id`/`transcript_id` attributes; gene and transcript rows are
+    /// GTF row: `gene_id`/`transcript_id` attributes; gene and transcript rows are
     /// used when present, otherwise synthesized from their children's spans.
     fn gtf_row(
         &mut self,

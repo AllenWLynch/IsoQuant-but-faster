@@ -1,4 +1,4 @@
-//! Metric computations (design §10.1, 00_scope acceptance metrics).
+//! Metric computations.
 
 use crate::annot::{LABEL_CLASSES, STRUCT_CLASSES};
 use crate::io::{coarse_of, Model, Side, COARSE_FATES, FINE_FATES, NO_MODEL};

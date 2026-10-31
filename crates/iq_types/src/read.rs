@@ -1,5 +1,5 @@
 //! Per-read types: raw record view (U2 → U4/U7), aligned read (U4 out), the logical
-//! [`ReadRecord`] (collect output = construct input, design §2.3), reference slices and
+//! [`ReadRecord`] (collect output = construct input), reference slices and
 //! pass-A blocks (U3).
 
 use crate::assign::Assignment;
@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 // ReadRecord
 // ------------------------------------------------------------------------------------------
 
-/// Logical read record = one 4.1 `ReadAssignment` as dumped after collect (design §2.3).
+/// Logical read record = one 4.1 `ReadAssignment` as dumped after collect.
 /// Physical storage is the columnar [`crate::BlockStore`]; convert with
 /// [`crate::BlockStore::from_records`] / [`crate::BlockStore::to_records`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ReadRecord {
-    /// Position in block, BAM order (= 4.1 dump order, §5.5).
+    /// Position in block, BAM order (= 4.1 dump order).
     pub idx: u32,
     /// QNAME. Kept in the BlockStore's cold-name arena.
     pub name: String,
@@ -123,7 +123,7 @@ pub enum TagValue {
 }
 
 impl TagValue {
-    /// Python `str(value)` formatting for integer/string/char values (design §8.3). Floats
+    /// Python `str(value)` formatting for integer/string/char values. Floats
     /// use Rust's shortest round-trip form, which equals Python `repr` for finite values
     /// except for exponent formatting; HP tags are never floats in practice.
     pub fn to_group_string(&self) -> String {
@@ -149,7 +149,7 @@ pub struct RecordLite<'a> {
     pub mapq: u8,
     /// Raw BAM CIGAR words (`len << 4 | op`), see [`cigar_decode`].
     pub cigar: &'a [u32],
-    /// Sequence decoded to ASCII letters `=ACMGRSVTWYHKDBN` (IUPAC kept, design §6.1).
+    /// Sequence decoded to ASCII letters `=ACMGRSVTWYHKDBN` (IUPAC kept).
     pub seq: &'a [u8],
     pub tag: Option<&'a TagValue>,
 }
@@ -224,7 +224,7 @@ pub struct AlignedRead {
 }
 
 /// Borrowed reference sequence window. `seq[0]` is the base at 1-based position `start`.
-/// No case folding (pyfaidx default, design §6.1).
+/// No case folding (pyfaidx default).
 #[derive(Clone, Copy, Debug)]
 pub struct RefSlice<'a> {
     pub start: Pos,

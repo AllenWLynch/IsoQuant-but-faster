@@ -1,7 +1,7 @@
 //! U12: `IntronPathStorage.fill`, `IntronPathProcessor.thread_*` (`intron_path.py:17-163`),
 //! `get_known_spliced_isoforms` (`context.py:202-224`).
 //!
-//! Design §7.3. Differences from 4.1 that keep the outputs identical:
+//! Differences from 4.1 that keep the outputs identical:
 //! - [`PathProcessor::new`] precomputes, per intron vertex and side, everything
 //!   `thread_ends`/`thread_starts` derive from `get_outgoing`/`get_incoming` on every call
 //!   (sorted polyA/TSS position lists, the outermost neighbouring exon boundary, and the last

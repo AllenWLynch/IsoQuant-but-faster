@@ -1,4 +1,4 @@
-//! The stage interface the scheduler drives (design §5.4).
+//! The stage interface the scheduler drives.
 //!
 //! The scheduler ([`crate::engine::execute`]) knows nothing about reads, models or files; it
 //! drives an implementation of [`Pipeline`] through the two-phase run:
@@ -41,7 +41,7 @@ impl std::ops::AddAssign for ReadTotals {
     }
 }
 
-/// Default per-read byte constants of the admission estimates (design §5.4; calibrated in
+/// Default per-read byte constants of the admission estimates (calibrated in
 /// `docs/vtg_proto.md`: ~99 B/read with a stub assignment; U21 real runs measured 187-249 B/read
 /// resident `len_bytes` with real assignments, PacBio and ONT).
 pub const EST_COLLECT_BYTES_PER_READ: u64 = 224;

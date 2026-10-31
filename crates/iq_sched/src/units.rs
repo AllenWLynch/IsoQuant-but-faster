@@ -1,4 +1,4 @@
-//! Work-unit formation (design §5.3).
+//! Work-unit formation.
 //!
 //! A *legal* work unit is a maximal run of consecutive blocks of one chromosome in which
 //! adjacent blocks share at least one gene. Blocks sharing a gene must be constructed in one
@@ -73,7 +73,7 @@ fn share_gene(a: &Block, b: &Block) -> bool {
     a.gene_ids.iter().any(|g| b.gene_ids.contains(g))
 }
 
-/// Legal work units: block index ranges `[lo, hi)` in genomic order (design §5.3).
+/// Legal work units: block index ranges `[lo, hi)` in genomic order.
 pub fn form_units(blocks: &[Block]) -> Vec<Range<usize>> {
     let mut out = Vec::new();
     if blocks.is_empty() {

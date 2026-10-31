@@ -1,11 +1,11 @@
 //! U17: construction read (re)assignment and read ownership
 //! (`ConstructionReadAssigner`, `model_construction/read_assigner.py:33-154`;
-//! `reference_unique_known_isoform`, `context.py:36-44`; design §7.8).
+//! `reference_unique_known_isoform`, `context.py:36-44`).
 //!
 //! [`assign_reads_to_models`] runs twice per block (after the pre-filter and after the
 //! filter); [`resolve_ownership`] runs once after the second pass.
 //!
-//! Structure of `assign_reads_to_models` (design §7.8, §5.5 rule 2):
+//! Structure of `assign_reads_to_models`:
 //! 1. `IsoformIndex::from_models(models)` is built once per call.
 //! 2. Reads go in chunks of [`CHUNK`]. For every read of a chunk that will reach the
 //!    profiling branch (not yet bound, not gated to a reference-unique known isoform), the

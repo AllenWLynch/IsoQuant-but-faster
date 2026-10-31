@@ -1,10 +1,10 @@
 //! # iq_sched — U21: work units, admission control, rayon orchestration, spill,
 //! deterministic merge
 //!
-//! Design §5.3-5.8. Replaces 4.1's `dataset_processor.py` / `parallel_workers.py`.
+//! Replaces 4.1's `dataset_processor.py` / `parallel_workers.py`.
 //!
-//! - [`units`]: work units (§5.3) and the `IQRS_DEBUG_UNIT_SPLIT` modes;
-//! - [`admission`]: byte-budget admission (§5.4) and budget detection;
+//! - [`units`]: work units and the `IQRS_DEBUG_UNIT_SPLIT` modes;
+//! - [`admission`]: byte-budget admission and budget detection;
 //! - [`pipeline`]: the [`Pipeline`] trait the scheduler drives (two-phase run);
 //! - [`engine`]: the coordinator ([`execute`]);
 //! - [`profile`]: `--profile` (RSS sampler, per-phase wall/CPU, est-vs-actual);
@@ -27,7 +27,7 @@ pub use units::SplitMode;
 use iq_types::DataType;
 use std::path::PathBuf;
 
-/// Run configuration (the `iqrs` CLI, design §7.0).
+/// Run configuration (the `iqrs` CLI).
 #[derive(Clone, Debug)]
 pub struct Config {
     pub bam: PathBuf,

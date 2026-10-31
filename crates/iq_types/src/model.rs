@@ -1,5 +1,5 @@
-//! Construct-side types: intron-graph state and paths (design §2.5), transcript models and
-//! the per-block `ModelStore` (§2.6), terminal predictions (U10), final assignments (§2.4).
+//! Construct-side types: intron-graph state and paths, transcript models and
+//! the per-block `ModelStore`, terminal predictions (U10), final assignments.
 
 use crate::assign::GeneKey;
 use crate::enums::{AssignmentType, TranscriptModelType};
@@ -53,7 +53,7 @@ pub mod vertex_code {
     pub const TSS_LEFT: i64 = -22;
 }
 
-/// Graph-local vertex id, for unit-internal adjacency tables (§2.5).
+/// Graph-local vertex id, for unit-internal adjacency tables.
 pub type VId = u32;
 
 /// An intron path: a sequence of vertices (terminals included where threaded).
@@ -130,7 +130,7 @@ impl ModelKind {
     }
 }
 
-/// A transcript model (`gene_info.py:35-52` `TranscriptModel`), design §2.6.
+/// A transcript model (`gene_info.py:35-52` `TranscriptModel`).
 ///
 /// Note: `intron_path` holds the vertex tuples themselves (not graph-local `VId`s), so a
 /// model is meaningful without its graph; it is empty for known and assignment-based models
@@ -231,7 +231,7 @@ impl ModelStore {
     }
 }
 
-/// Compact final per-read assignment against models (U19 → U20, design §2.4).
+/// Compact final per-read assignment against models (U19 → U20).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FinalAssign {
     pub atype: AssignmentType,

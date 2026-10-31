@@ -1,20 +1,20 @@
 //! # iq_types — the iqrs contract crate (unit U0, milestone M0)
 //!
 //! Every other crate depends on this one, and units U1–U21 are developed against it in
-//! parallel. Contents (design doc `specs/07_rust_design.md`):
+//! parallel. Contents:
 //!
-//! | module | design | contents |
-//! |---|---|---|
-//! | [`prim`] | §2.1 | `Pos`, `Iv`, `Iv0`, `Strand`, `PolyAInfo`, index aliases |
-//! | [`enums`] | §2.1 | IsoQuant enums with their numeric codes, cost table, event sets |
-//! | [`assign`] | §2.1, §2.4 | `MatchEvent`, `IsoformMatch`, `Assignment`, `GeneKey`, `IsoRef` |
-//! | [`read`] | §2.3, U2-U4 | `ReadRecord`, `RecordLite`, `AlignedRead`, `RefSlice`, `Block` |
-//! | [`store`] | §2.3 | `BlockStore`, `ChainTable`, `ReadView` |
-//! | [`index`] | §2.2 | `IsoformIndex`, `ProfMatrix`, read profiles |
-//! | [`model`] | §2.5-2.6 | `Vertex`, `IntronGraph`, `PathStorage`, `TranscriptModel`, `ModelStore` |
-//! | [`intern`] | §1.2 | `Interner`, `GroupPool` |
-//! | [`params`] | §7.0 | `Params` and the two built-in presets |
-//! | [`fixture`] | §3.0 | fixture IO, schema DTOs, `UnitFixture`, `Verdict`, diff, registry |
+//! | module | contents |
+//! |---|---|
+//! | [`prim`] | `Pos`, `Iv`, `Iv0`, `Strand`, `PolyAInfo`, index aliases |
+//! | [`enums`] | IsoQuant enums with their numeric codes, cost table, event sets |
+//! | [`assign`] | `MatchEvent`, `IsoformMatch`, `Assignment`, `GeneKey`, `IsoRef` |
+//! | [`read`] | `ReadRecord`, `RecordLite`, `AlignedRead`, `RefSlice`, `Block` |
+//! | [`store`] | `BlockStore`, `ChainTable`, `ReadView` |
+//! | [`index`] | `IsoformIndex`, `ProfMatrix`, read profiles |
+//! | [`model`] | `Vertex`, `IntronGraph`, `PathStorage`, `TranscriptModel`, `ModelStore` |
+//! | [`intern`] | `Interner`, `GroupPool` |
+//! | [`params`] | `Params` and the two built-in presets |
+//! | [`fixture`] | fixture IO, schema DTOs, `UnitFixture`, `Verdict`, diff, registry |
 //!
 //! Conventions: genomic coordinates are 1-based closed (`Iv`); maps whose order can reach an
 //! output are `IndexMap` (= Python dict insertion order); enums carry IsoQuant codes.

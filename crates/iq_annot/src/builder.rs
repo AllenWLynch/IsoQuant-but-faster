@@ -1,4 +1,4 @@
-//! `IsoformIndex` builders (design §4.3): `GeneInfo.__init__` (`gene_info.py:233-280`),
+//! `IsoformIndex` builders: `GeneInfo.__init__` (`gene_info.py:233-280`),
 //! `GeneInfo.from_models` (`:283-356`) and `GeneInfo.from_region`.
 //!
 //! 4.1 dict semantics are reproduced where ids can repeat: an isoform keeps the position of
@@ -78,7 +78,7 @@ pub fn index_from_region(chr: ChrIdx, start: Pos, end: Pos, delta: i32) -> Isofo
 /// 4.1 `GeneInfo.from_models`. `chr` is the models' chromosome (`0` for an empty list).
 ///
 /// `id_rank` follows `ModelIdx` (creation) order, the stand-in for transcript-id order
-/// while ids are provisional (design §5.6); [`index_from_models_named`] ranks real ids.
+/// while ids are provisional; [`index_from_models_named`] ranks real ids.
 pub fn index_from_models(chr: ChrIdx, models: &[TranscriptModel], delta: i32) -> IsoformIndex {
     let keys: Vec<String> = models.iter().map(|m| format!("{:010}", m.key)).collect();
     let names: Vec<&str> = keys.iter().map(String::as_str).collect();

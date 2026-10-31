@@ -6,7 +6,7 @@
 //! - reference transcripts → `IsoRef::Ref(txs.intern(id))`;
 //! - models → `IsoRef::Model(models.intern(id))`: `ModelIdx` = first-seen order of the 4.1
 //!   transcript id within the block, which equals creation order when snapshots are
-//!   converted in call order (design §3.0). Call [`IdMaps::reset_block`] between blocks.
+//!   converted in call order. Call [`IdMaps::reset_block`] between blocks.
 //!   A known model's id is also its reference transcript id.
 //! - read groups: the `read_group` list of a record → [`crate::GroupPool`] id (empty list
 //!   → 0; several names are joined with `\x1f`).

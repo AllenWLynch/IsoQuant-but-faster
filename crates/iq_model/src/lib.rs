@@ -1,7 +1,7 @@
 //! # iq_model — U13-U19: model construction, filtering, end processing, splice-site
 //! correction, reassignment, gene joining, final per-read assignment
 //!
-//! Design §7.1, §7.4-7.11. Stages mutate a [`iq_types::ModelStore`] given a read-only
+//! Stages mutate a [`iq_types::ModelStore`] given a read-only
 //! [`Ctx`]. Nested U6 calls go through the [`ReadAssigner`] trait so stages can be tested
 //! with a replaying assigner before U6 passes.
 //! Fixture runners: units `U13`-`U19` (see SCHEMA §4), [`register_fixtures`].

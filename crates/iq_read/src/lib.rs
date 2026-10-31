@@ -1,7 +1,7 @@
 //! # iq_read — U4 (CIGAR blocks, polyA/T, deletions) and U7 (exon correction, strand,
 //! antisense, read groups)
 //!
-//! Design §6.2-6.4. Fixture runners: unit `U4` (fns `process_alignment`,
+//! Fixture runners: unit `U4` (fns `process_alignment`,
 //! `extract_relevant_deletions`) and `U7` (fns `correct_assigned_read`,
 //! `get_assignment_strand`, `check_antisense`), see [`register_fixtures`].
 #![allow(unused_variables)] // stub: remove once implemented

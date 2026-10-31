@@ -1,4 +1,4 @@
-//! Byte-budget admission control (design §5.4) and memory-budget detection.
+//! Byte-budget admission control and memory-budget detection.
 //!
 //! The controller tracks two quantities:
 //! - `in_flight`: the *estimated* bytes of running tasks (released when a task ends);
@@ -112,7 +112,7 @@ pub fn mem_available() -> Option<u64> {
     Some(kb * 1024)
 }
 
-/// Default budget: 0.85 × min(cgroup limit, MemAvailable) (design §5.4). Falls back to 8 GiB
+/// Default budget: 0.85 × min(cgroup limit, MemAvailable). Falls back to 8 GiB
 /// when neither is readable.
 pub fn default_budget() -> u64 {
     let lim = match (cgroup_limit(), mem_available()) {

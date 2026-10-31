@@ -10,7 +10,7 @@ use iq_types::{
 pub type DetectedKnown = IndexSet<TxIdx>;
 
 /// Abstraction over U6 so stages can run against recorded assignments
-/// (`ReplayAssigner`, design §3 U13) or the live assigner.
+/// (`ReplayAssigner`) or the live assigner.
 pub trait ReadAssigner: Sync {
     /// Assign a profile against `index` (`quick_mode` as in 4.1 `assign_to_isoform`).
     /// `read_key` identifies the call for replay (read index or provisional model key).

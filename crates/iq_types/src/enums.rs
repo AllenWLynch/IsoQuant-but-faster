@@ -1,5 +1,5 @@
-//! IsoQuant 4.1 enums with their **exact numeric codes**, so fixtures can carry raw integers
-//! (design §2.1). Every enum here:
+//! IsoQuant 4.1 enums with their **exact numeric codes**, so fixtures can carry raw integers.
+//! Every enum here:
 //! - serializes/deserializes as its integer code (unknown codes are a hard error);
 //! - has `code()`, `from_code()`, `py_name()` (the Python member name) and `ALL`.
 //!

@@ -1,4 +1,4 @@
-//! gffutils-compatible attribute handling (design §4.1).
+//! gffutils-compatible attribute handling.
 //!
 //! The pipeline's DB was built by gffutils 0.14 with the inferred Ensembl GFF3 dialect
 //! (`field separator ';'`, `keyval separator '='`, no quoting, no repeated keys). gffutils

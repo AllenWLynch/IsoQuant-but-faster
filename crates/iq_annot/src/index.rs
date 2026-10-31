@@ -1,10 +1,10 @@
-//! The run-wide annotation index (design §2.2): flat tables, built once, `Arc`-shared.
+//! The run-wide annotation index: flat tables, built once, `Arc`-shared.
 //!
 //! Layout:
 //! - `genes` sorted by `(chr, start, file order)`;
 //! - `txs` grouped by gene (gene `g` owns `txs[g.tx_off .. g.tx_off + g.n_tx]`), within a gene
 //!   ordered by `(start, file order)` = gffutils `children(order_by='start')`;
-//! - `exons` flat per transcript, after the CDS-as-exon rule (§4.2);
+//! - `exons` flat per transcript, after the CDS-as-exon rule;
 //! - `other` flat per transcript (CDS/start_codon/stop_codon/UTR children, file order);
 //! - all strings in one arena (`StrRef`).
 //!
@@ -92,7 +92,7 @@ pub struct AnnotationIndex {
     pub(crate) chr_genes: Vec<(u32, u32)>,
     /// Running max of gene ends within each chromosome's range (same indexing as `genes`).
     pub(crate) prefix_max_end: Vec<Pos>,
-    /// `(chr, start, end, strand)` → `exon_id` (§8.1; last exon row in file order wins).
+    /// `(chr, start, end, strand)` → `exon_id` (last exon row in file order wins).
     pub(crate) exon_ids: HashMap<(ChrIdx, Pos, Pos, Strand), StrRef>,
     /// Per chromosome: sorted novel-id numbers taken by input ids (`id_policy.py:20-45`).
     pub(crate) forbidden: Vec<Vec<u64>>,
@@ -138,7 +138,7 @@ impl AnnotationIndex {
     }
 
     /// Genes with `start <= iv.e && end >= iv.s` (1-based closed), sorted by
-    /// `(start, file order)` (§4.3). O(log G + k).
+    /// `(start, file order)`. O(log G + k).
     pub fn genes_overlapping(&self, chr: ChrIdx, iv: Iv) -> SmallVec<[GeneIdx; 4]> {
         let mut out = SmallVec::new();
         let Some(&(lo, hi)) = self.chr_genes.get(chr as usize) else { return out };
@@ -239,7 +239,7 @@ impl AnnotationIndex {
     pub fn tx_exon_attrs(&self, t: TxIdx) -> String {
         attrs::format_attrs(&self.tx_attributes(t), attrs::EXON_SKIP)
     }
-    /// Exons of a transcript (after the CDS-as-exon rule, §4.2). Empty for transcripts
+    /// Exons of a transcript (after the CDS-as-exon rule). Empty for transcripts
     /// without exon/CDS children (4.1 keeps those in strand/gene maps only).
     pub fn tx_exons(&self, t: TxIdx) -> &[Iv] {
         let r = &self.txs[t as usize];
@@ -260,7 +260,7 @@ impl AnnotationIndex {
 
     /// Annotation `exon_id` of an exon (`FeatureIdStorage`, `id_policy.py:56-66`). For
     /// coordinates shared by several exon rows, the **last** row in file order wins (4.1 dict
-    /// overwrite; design §2.2/§8.1 "first" is wrong).
+    /// overwrite).
     pub fn exon_id(&self, chr: ChrIdx, iv: Iv, strand: Strand) -> Option<&str> {
         self.exon_ids.get(&(chr, iv.s, iv.e, strand)).map(|&r| self.s(r))
     }

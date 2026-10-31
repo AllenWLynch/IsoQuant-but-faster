@@ -10,8 +10,7 @@
 //! - `inconsistent.rs` (U6b) implements `Assigner::match_inconsistent` (`:620-830`).
 //!
 //! Isoforms are referred to by their position in `IsoformIndex::iso` (`u32`). Python sets
-//! and `sorted(isoform_ids)` become `iso`-ordered candidate lists and sorts by `id_rank`
-//! (design §6.4.1).
+//! and `sorted(isoform_ids)` become `iso`-ordered candidate lists and sorts by `id_rank`.
 
 use crate::polya_verify::PolyAVerifier;
 use crate::profile::Scratch;

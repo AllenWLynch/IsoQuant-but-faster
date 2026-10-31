@@ -1,5 +1,4 @@
-//! `--profile`: RSS sampler, per-phase wall/CPU, admission estimate-vs-actual log
-//! (design §10.5).
+//! `--profile`: RSS sampler, per-phase wall/CPU, admission estimate-vs-actual log.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;

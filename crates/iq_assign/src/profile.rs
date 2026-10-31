@@ -1,5 +1,5 @@
 //! U5: `CombinedProfileConstructor` (`assignment/long_read_profiles.py:73-281`) with the
-//! windowed sweep of §6.4.2. `CombinedProfile` (dense) is the output and comparison form.
+//! windowed sweep `CombinedProfile` (dense) is the output and comparison form.
 //!
 //! # Windowed sweep (identical outputs to the 4.1 full scan)
 //! Known features are sorted by `(start, end)`; ends are not monotone (intron features

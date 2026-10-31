@@ -1,4 +1,4 @@
-//! Duplicate-name candidates (design §5.1, §5.5): 64-bit name hashes of primary records
+//! Duplicate-name candidates: 64-bit name hashes of primary records
 //! that occur more than once on a chromosome.
 //!
 //! A scalable blocked Bloom filter replaces a `Vec<u64>` of every hash (8 B/read): ~1.5 B/read.

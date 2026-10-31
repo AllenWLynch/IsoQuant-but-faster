@@ -36,7 +36,8 @@ REQUIRED:
     -o, --output DIR           Output directory (created if missing)
 
 OPTIONS:
-    -t, --threads N            Worker threads [default: 1]; outputs do not depend on N
+    -t, --threads N            Worker threads [default: all CPUs available to this process,
+                               respecting SLURM/cgroup limits]; outputs do not depend on N
     --report-novel-unspliced true|false
                                Report novel mono-exonic transcripts [default: true, as IsoQuant
                                4.1 for the sensitive strategies]
@@ -99,7 +100,7 @@ fn parse() -> Result<Option<Config>, Usage> {
     let mut p = lexopt::Parser::from_env();
     let (mut bam, mut reference, mut annotation, mut out_dir) = (None, None, None, None);
     let mut data_type = None;
-    let mut threads = 1usize;
+    let mut threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let mut max_mem = None;
     let mut report_novel_unspliced = true;
     let mut read_group_tag = None;

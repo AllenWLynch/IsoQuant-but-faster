@@ -4,7 +4,7 @@
 //! (`gene_info.py:924-967`) with `get_intron_strand` (`common.py:854-864`), and
 //! `check_antisense` (`alignment_processor.py:684-695`).
 //!
-//! Hot-path notes (design §6.4.5):
+//! Hot-path notes:
 //! - 4.1 materialises `get_aligned_pairs()` for the whole read. Here the aligned-pair list
 //!   stays virtual: the pair index of an exon boundary comes from one monotone CIGAR walk,
 //!   and only the ≤24 pairs of the window around a site are generated, on demand.

@@ -9,6 +9,7 @@ First public release.
   `sensitive_ont`.
 - Options: `--report-novel-unspliced`, per-tag grouped counts (`--read-group tag:TAG`) and
   `--gene-types isoquant|all` (default `isoquant`; `all` is not validated against 4.1).
+- `--threads` defaults to all CPUs available to the process (respects SLURM/cgroup limits).
 - Outputs: `transcript_models.gtf`, `discovered_transcript_counts.tsv` and the grouped linear
   counts table, in IsoQuant 4.1's formats.
 - IsoQuant 4.1's quirks are reproduced (see `docs/dev/deviations.md`). There is no separate

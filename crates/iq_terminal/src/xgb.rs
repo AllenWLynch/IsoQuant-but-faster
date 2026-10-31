@@ -1,4 +1,4 @@
-//! U10a: native XGBoost tree evaluation in f32 (design §7.9).
+//! U10a: native XGBoost tree evaluation in f32.
 //!
 //! Ports what `XGBClassifier.predict` / `predict_proba` / `get_booster().predict(output_margin=True)`
 //! compute for IsoQuant's two bundled `binary:logistic` gbtree models (xgboost 3.4.2):
@@ -37,7 +37,7 @@ pub struct XgbModel {
 
 /// Base margins as xgboost 3.4.2 computes them for the bundled models (`base_score` string →
 /// f32 bits). Recomputing `-log(1/b - 1)` with other log routines is off by 1-3 ulp, which
-/// flips many margins (design §7.9); these bits were checked against the fixtures' margins.
+/// flips many margins; these bits were checked against the fixtures' margins.
 const KNOWN_BASE_MARGINS: &[(&str, u32)] = &[("[5.7763106E-1]", 0x3ea0_48e8), ("[3.413823E-1]", 0xbf28_3a5a)];
 
 fn field<'a>(v: &'a Value, k: &str) -> Result<&'a Value, String> {
@@ -214,7 +214,7 @@ pub mod fixture {
         Ok(std::array::from_fn(|i| f[i].0))
     }
 
-    /// Judges one model output (margin, proba, label) against 4.1 (§3 U10a pass criteria):
+    /// Judges one model output (margin, proba, label) against 4.1 (U10a fixture pass criteria):
     /// probabilities |Δ| ≤ 1e-6, labels exact unless |margin| < 1e-5. Margins are expected
     /// bit-equal; a margin difference alone (within the proba tolerance) is still reported.
     pub(crate) fn judge_pred(path: &str, got: (f64, f64, i32), want: (f64, f64, i32), out: &mut Vec<DiffEntry>) {

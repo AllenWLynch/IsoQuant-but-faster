@@ -18,20 +18,20 @@ use crate::prim::{Iv, Iv0, PolyAInfo, Pos, Strand};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-/// `[key, value]` pair list in Python dict order (§0.4).
+/// `[key, value]` pair list in Python dict order.
 pub type Pairs<K, V> = Vec<(K, V)>;
 /// CIGAR as `[[op, len]]`.
 pub type CigarFixture = Vec<(u8, u32)>;
 /// `(start, end, featuretype)` triples (`other_features`).
 pub type OtherFeatures = Vec<(Pos, Pos, String)>;
-/// An intron-graph path `[[a,b], ...]` (§2.8).
+/// An intron-graph path `[[a,b], ...]`.
 pub type PathFixture = Vec<Vertex>;
 
 // =========================================================================================
-// §0.2 envelope, §0.8 exceptions
+// §0.2 envelope exceptions
 // =========================================================================================
 
-/// One fixture line (§0.2). `I`/`O` default to raw JSON.
+/// One fixture line. `I`/`O` default to raw JSON.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Case<I = serde_json::Value, O = serde_json::Value> {
     pub unit: String,
@@ -42,7 +42,7 @@ pub struct Case<I = serde_json::Value, O = serde_json::Value> {
     pub out: O,
 }
 
-/// `out` of a call that raised (§0.8).
+/// `out` of a call that raised.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExceptionOut {
     pub exception: String,
@@ -416,7 +416,7 @@ pub struct U1GeneInfoForRegionIn {
     #[serde(rename = "fn")]
     pub fn_: String,
     pub chr: String,
-    /// As passed by 4.1 (0-based closed storage region, §0.5).
+    /// As passed by 4.1 (0-based closed storage region).
     pub region: Iv0,
     pub delta: i32,
     pub needs_reference: bool,

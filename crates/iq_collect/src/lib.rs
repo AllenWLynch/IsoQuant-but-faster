@@ -1,10 +1,10 @@
 //! # iq_collect — U8 (block collector, composes U4-U7) and U9 (multimapper resolution)
 //!
-//! Design §6.2, §5.2, §5.4-5.5. Entry points:
+//! Entry points:
 //! - [`collect_block`]: one block's BAM records → [`BlockStore`] (pure function).
 //! - [`BlockCollector`]: the same, streaming: feed record batches with
 //!   [`BlockCollector::push`], then [`BlockCollector::finish`] for the store and
-//!   [`CollectStats`] (read and polyA counts for the §5.4 barrier). Per-read work inside a batch runs
+//!   [`CollectStats`] (read and polyA counts for the barrier). Per-read work inside a batch runs
 //!   data-parallel on rayon; results are appended in BAM order, so the output does not
 //!   depend on the thread count.
 //! - U9: [`multimap::resolve`] and [`multimap::resolve_chr_duplicates`].
@@ -164,7 +164,7 @@ impl<F: Fn(Option<&TagValue>) -> u32 + Sync> GroupIds for FnGroups<F> {
 // Stats and timing
 // ------------------------------------------------------------------------------------------
 
-/// Per-block counters. `stored`/`polya_found` feed the sample-wide polyA fraction (§5.4).
+/// Per-block counters. `stored`/`polya_found` feed the sample-wide polyA fraction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CollectStats {
     /// Records given to the collector.

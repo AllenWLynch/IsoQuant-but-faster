@@ -1,4 +1,4 @@
-//! Fixture machinery (design §3.0; schema `harness/iqcap/SCHEMA.md`).
+//! Fixture machinery (schema `harness/iqcap/SCHEMA.md`).
 //!
 //! - [`schema`]: DTOs mirroring the JSON exactly; [`convert`]: DTO ↔ core types;
 //!   [`ids`]: id-string maps.
@@ -432,7 +432,7 @@ fn panic_msg(p: &Box<dyn std::any::Any + Send>) -> String {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
     Verdict(Verdict),
-    /// `out` is a recorded Python exception (§0.8); not run.
+    /// `out` is a recorded Python exception; not run.
     PyException(String),
     /// Payload did not deserialize into the runner's DTOs.
     Decode(String),
@@ -677,7 +677,7 @@ pub fn find_capture_dirs(root: &Path, out: &mut Vec<PathBuf>) -> FixResult<()> {
     Ok(())
 }
 
-/// Fixtures root from `$IQRS_FIXTURES` (design §11), if set.
+/// Fixtures root from `$IQRS_FIXTURES`, if set.
 pub fn fixtures_root() -> Option<PathBuf> {
     std::env::var_os("IQRS_FIXTURES").map(PathBuf::from)
 }

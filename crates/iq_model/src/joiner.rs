@@ -1,7 +1,7 @@
 //! U18: `TranscriptToGeneJoiner` (`model_construction/transcript_to_gene_joiner.py:17-125`).
 //!
 //! Joins novel genes into overlapping annotated genes, or into each other, by rewriting the
-//! models' gene keys. Scoring is verbatim (design §7.10): same strand only; shared introns →
+//! models' gene keys. Scoring is verbatim: same strand only; shared introns →
 //! `1 + shared/union`; otherwise `overlap / min(len)` if ≥ 0.5; never two annotated genes.
 //!
 //! ## Layout (equivalent to 4.1, cheaper)

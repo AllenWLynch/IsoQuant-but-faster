@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 /// `GeneKey::Novel(1 + max)` over the store's models (0 if none).
 ///
-/// Block-local numbering (design §5.6; renumbered at output). Caveat: if the model holding
+/// Block-local numbering (renumbered at output). Caveat: if the model holding
 /// the largest novel gene number was deleted, its number is reused. That is harmless in
 /// production (genes exist only through models), but the fixture remap then treats the
 /// gene as pre-existing.

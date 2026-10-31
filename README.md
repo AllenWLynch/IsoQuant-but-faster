@@ -46,7 +46,7 @@ opt-in and has not been validated against IsoQuant 4.1.
 
 ## Install
 
-Each [GitHub release](https://github.com/OWNER/iqrs/releases) has prebuilt binaries:
+Each [GitHub release](https://github.com/AllenWLynch/iqrs/releases) has prebuilt binaries:
 
 - `x86_64-unknown-linux-gnu`: needs glibc 2.17 or newer, the fastest option on Linux.
 - `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`: fully static, run on any Linux,
@@ -64,7 +64,7 @@ sha256sum -c iqrs-v0.1.0-x86_64-unknown-linux-musl.tar.gz.sha256   # optional
 You need Rust 1.95 or newer (`rustup`). There are no C dependencies.
 
 ```bash
-git clone https://github.com/OWNER/iqrs && cd iqrs
+git clone https://github.com/AllenWLynch/iqrs && cd iqrs
 cargo build --release          # binary: target/release/iqrs
 ```
 

@@ -1,4 +1,4 @@
-//! U14: assignment-based models (`assignment_based_constructor.py:32-256`, design §7.5).
+//! U14: assignment-based models (`assignment_based_constructor.py:32-256`).
 //!
 //! One pass over the reads partitions them into known mono-exon, known spliced (non-FL) and
 //! novel mono-exon candidates; then models are emitted in 4.1 order: known mono-exon

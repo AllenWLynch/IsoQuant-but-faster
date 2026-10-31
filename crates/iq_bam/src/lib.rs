@@ -1,6 +1,6 @@
 //! # iq_bam — U2: BAM and FASTA IO
 //!
-//! Design §6.1. noodles-based `fetch` with parallel BGZF inflate yielding
+//! noodles-based `fetch` with parallel BGZF inflate yielding
 //! [`RecordBatch`]es of lazily parsed records ([`iq_types::RecordLite`] views), and an
 //! mmap'd FASTA ([`FastaIndex`]). `--features htslib` swaps in a rust-htslib
 //! [`RecordSource`] implementation.

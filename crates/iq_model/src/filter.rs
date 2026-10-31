@@ -78,7 +78,7 @@ pub fn mapping_quality(ms: &mut ModelStore, ctx: &Ctx<'_>, key: ModelIdx) -> f64
 // pre_filter_transcripts
 // ------------------------------------------------------------------------------------------
 
-/// `pre_filter_transcripts` (`model_filter.py:49-78`), incl. the chrM hack (KEEP, design §7.6).
+/// `pre_filter_transcripts` (`model_filter.py:49-78`), incl. the chrM hack (KEEP).
 pub fn pre_filter(ms: &mut ModelStore, ctx: &Ctx<'_>) {
     let mut vals: Vec<i64> = ms.models.iter().filter(|m| m.exons.len() <= 2).map(|m| counter(ms, m.key)).collect();
     vals.sort_unstable_by(|a, b| b.cmp(a));

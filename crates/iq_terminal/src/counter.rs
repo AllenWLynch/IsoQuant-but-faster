@@ -4,7 +4,7 @@
 //! 4.1 feeds every read of a block to the ungrouped polyA (always) and TSS (`--fl_data` only)
 //! counters, then `flush()` predicts on that block's accumulation (`last_gene_predictions`,
 //! consumed by the intron graph, U11) and clears it (`parallel_workers.py:312-330`). The
-//! chromosome-wide `dump()` TSV is a side output and is not ported (design §1.3).
+//! chromosome-wide `dump()` TSV is a side output and is not ported.
 //!
 //! **Accumulation.** One flat `(slot, pos)` buffer per counter in read order plus a dense
 //! `TxIdx → slot` map (slot = first-read order of the transcript = 4.1 dict order). No per-read

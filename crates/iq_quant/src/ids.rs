@@ -1,4 +1,4 @@
-//! Phase-W ID assignment (design §5.6): `transcript<N>.<chr>.nic|nnic` and
+//! Phase-W ID assignment: `transcript<N>.<chr>.nic|nnic` and
 //! `novel_gene_<chr>_<N>` from one per-chromosome counter that skips `forbidden_ids`
 //! (`ExcludingIdDistributor`, `utils/id_policy.py:20-51`; KEEP, #219), and the novel
 //! `exon_id` storage (`FeatureIdStorage`, `:55-75`; a new id is printed bare, as in 4.1).

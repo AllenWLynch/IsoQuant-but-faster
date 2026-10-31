@@ -1,4 +1,4 @@
-//! `iqrs-compare`: end-to-end scoring of two IsoQuant-format output sets (design §10.1).
+//! `iqrs-compare`: end-to-end scoring of two IsoQuant-format output sets.
 //!
 //! Any two output sets (IsoQuant 4.1, iqrs, or two iqrs runs) can be compared. Models are matched by structure only (transcript and gene IDs are never assumed
 //! to correspond): multi-exon by `(chr, strand, exact intron chain)`, mono-exon by same-strand

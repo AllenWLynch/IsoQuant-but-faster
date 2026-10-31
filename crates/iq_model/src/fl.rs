@@ -4,7 +4,7 @@
 //! NIC, or a novel (NIC/NNIC) model; the path's reads are bound to the new model
 //! (`ModelStore.save_assigned_read`, `context.py:76-82`).
 //!
-//! Structure (design §7.4):
+//! Structure:
 //! 1. FL paths are ordered `(len desc, Python tuple order)` (`:94-95`).
 //! 2. For every path that could produce a model, the path is profiled and assigned (U5/U6),
 //!    and `_reference_isoform_for_path` (`:42-90`) is evaluated. This part is pure, so it runs
@@ -23,7 +23,7 @@
 //!   *after* the terminals were stripped (`:107-112`), so it is always empty: `NO_POLYA`.
 //! - **D-M1**: no transcript/gene id is drawn for rejected paths. Models get `ModelIdx`
 //!   keys in creation order, novel genes `GeneKey::Novel(k)` in creation order; final ids
-//!   are assigned at output (design §5.6).
+//!   are assigned at output.
 //! - Technical replicas (`file_name` grouping, `:166-176`) are off in scope; not ported.
 
 use crate::ctx::{Ctx, DetectedKnown, ReadAssigner};

@@ -1,5 +1,5 @@
 //! `GFFPrinter.dump` (`model_construction/transcript_printer.py:19-138`), byte-exact
-//! modulo IDs (design §8.1).
+//! modulo IDs.
 //!
 //! [`GtfChrWriter`] holds the per-chromosome printer state (`printed_gene_ids`, the exon
 //! id storage). Blocks are fed in genomic order through [`GtfChrWriter::dump_block`] with

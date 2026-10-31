@@ -175,7 +175,7 @@ impl Builder<'_> {
     ///
     /// Same result as 4.1 in O(n log n + n·w): the approved set is a sorted vector, and for
     /// each vertex only approved introns with `|Δstart| < distance` (a contiguous range) are
-    /// scanned. The strict `<` thresholds are kept (design §7.2).
+    /// scanned. The strict `<` thresholds are kept.
     fn collapse_vertex_set(&mut self, set: &[Vertex]) -> Vec<(Vertex, Vertex)> {
         if set.len() <= 1 {
             return Vec::new();

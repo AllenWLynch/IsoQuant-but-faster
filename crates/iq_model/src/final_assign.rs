@@ -1,5 +1,5 @@
 //! U19: `ModelReadCounter.build_model_read_assignments`
-//! (`model_construction/model_read_counter.py:44-170`; design §3 U19, §2.4, §7.11).
+//! (`model_construction/model_read_counter.py:44-170`).
 //!
 //! One final assignment per block read against the block's finished models, emitted in read
 //! order through a sink (nothing is retained). Categories, checked in this order:
@@ -16,7 +16,7 @@
 //! 4. **leftover**: assigned against `from_models(all models)` (`quick_mode = false`),
 //!    or `noninformative` when the block has no models.
 //!
-//! Structure (performance, design §7.11):
+//! Structure (performance):
 //! - 4.1 builds a single-model `GeneInfo` + `LongReadAssigner` per model, lazily. iqrs
 //!   routes every read first (cheap), builds the index and `ProfileBuilder` of each model
 //!   that some read needs once per call (in parallel), and shares them.
@@ -78,7 +78,7 @@ pub fn single_assigner(ctx: &Ctx<'_>) -> LiveAssigner {
     LiveAssigner { params: AssignParams::new(single_matching(ctx), ctx.params.splice.clone(), false) }
 }
 
-/// Compacts an assignment for the counters (design §2.4): the model of every match that
+/// Compacts an assignment for the counters: the model of every match that
 /// names one, in match order.
 pub fn compact(a: &Assignment) -> FinalAssign {
     FinalAssign {

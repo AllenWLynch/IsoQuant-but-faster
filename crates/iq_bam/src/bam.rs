@@ -128,7 +128,7 @@ impl BamHandle {
         self.refs.iter().position(|r| r == chr)
     }
     /// pysam `bam.unmapped`: per-reference unmapped counts from the index metadata plus the
-    /// unplaced unmapped count (`nocoordinate`). Used for §8.2 `__not_aligned`.
+    /// unplaced unmapped count (`nocoordinate`). Used for `__not_aligned`.
     pub fn unmapped(&self) -> u64 {
         use noodles_csi::binning_index::ReferenceSequence as _;
         use noodles_csi::BinningIndex as _;
@@ -247,7 +247,7 @@ struct Meta {
 }
 
 /// A batch of decoded records in file order, with a sequence number for re-ordering after
-/// parallel processing (§5.5). Flat storage: no per-record allocation.
+/// parallel processing. Flat storage: no per-record allocation.
 #[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct RecordBatch {

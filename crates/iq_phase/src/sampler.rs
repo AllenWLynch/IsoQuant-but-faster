@@ -1,4 +1,4 @@
-//! Blocked Gibbs sampler for one locus (phased_model/code/gibbs.py; alpha from --phase-alpha, default 1).
+//! Blocked Gibbs sampler for one locus (phased_model/code/gibbs.py; alpha from --phase-alpha, default 5).
 //!
 //! Model: beta ~ Dir(gamma/T); theta_A, theta_B | beta ~ Dir(alpha beta); rho ~ Beta(a, a);
 //! read r: h_r ~ Bern(rho), t_r | h_r ~ Cat(theta_h) restricted to C_r (l_rt uniform), het
@@ -38,7 +38,7 @@ pub struct Cfg {
 
 impl Default for Cfg {
     fn default() -> Self {
-        Cfg { burnin: 200, sweeps: 1000, gamma: 1.0, alpha: 1.0, a_rho: 20.0 }
+        Cfg { burnin: 200, sweeps: 1000, gamma: 1.0, alpha: 5.0, a_rho: 20.0 }
     }
 }
 

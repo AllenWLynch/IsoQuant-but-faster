@@ -64,7 +64,7 @@ PHASED QUANTIFICATION (optional; off unless --phase-vcf is given):
     --phase-burnin N           Burn-in sweeps per gene [default: 200]
     --phase-seed N             Random seed [default: 1]; results do not depend on --threads
     --phase-alpha X            Dirichlet concentration tying haplotype A and B isoform
-                               proportions to a shared profile; larger = more shrinkage [default: 1]
+                               proportions to a shared profile; larger = more shrinkage [default: 5]
     -v, --verbose              Log progress and scheduling decisions to stderr
     -h, --help                 Print this help
     -V, --version              Print the version
@@ -135,7 +135,7 @@ fn parse() -> Result<Option<Config>, Usage> {
     let mut emit_read_assignments = None;
     let (mut phase_vcf, mut phase_sample) = (None, None);
     let (mut phase_sweeps, mut phase_burnin, mut phase_seed) = (1000u32, 200u32, 1u64);
-    let mut phase_alpha = 1.0f64;
+    let mut phase_alpha = 5.0f64;
     let (mut profile, mut verbose) = (false, false);
     while let Some(arg) = p.next().map_err(|e| Usage(e.to_string()))? {
         match arg {
